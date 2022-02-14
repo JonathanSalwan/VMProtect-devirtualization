@@ -130,7 +130,7 @@ itself does not depend on the user) but only operations related to the original 
 
 For example, below is an example of a concretization. On the left we have an AST that contains subexpressions which do not involve
 symbolic variable (`1 + 2` and `6 ^ 3`). So these branches are concretized and replaced by constants `3` and `5` which leads to
-the ASTon the right. **This is how we devirtualize code.**
+the AST on the right. **This is how we devirtualize code.**
 
 <p align="center">
   <img src="assets/screen2.png">
