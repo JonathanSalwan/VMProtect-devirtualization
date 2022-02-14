@@ -1,7 +1,7 @@
 ; ModuleID = 'tritonModule'
 source_filename = "tritonModule"
 
-define i32 @__triton(i8 %SymVar_1, i8 %SymVar_0) {
+define i32 @__triton(i8 %SymVar_0, i8 %SymVar_1) {
 entry:
   %0 = xor i8 %SymVar_0, 92
   %1 = and i8 %SymVar_0, 0
