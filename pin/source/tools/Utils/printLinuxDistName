@@ -1,0 +1,11 @@
+#! /bin/bash
+
+# This script prints the name of the Linux distribution in lowercase.
+# The name is retrieved from ID="<name>" line in the /etc/*-release file.
+# If there is no ID in this file then we fall back to extracting the name from lsb_release.
+
+dist_name="`cat /etc/*-release | grep ID | grep -v -E "_ID|ID_" | cut -d '=' -f 2 | sed 's/[ "=]//g' | head -1 | tr '[:upper:]' '[:lower:]'`"
+if [ -z "$dist_name" ]; then
+    dist_name="$(lsb_release -i |awk -F ':' '{print $2}' | awk '{print $1 }' | tr '[:upper:]' '[:lower:]')"
+fi
+echo $dist_name

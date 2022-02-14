@@ -1,0 +1,18 @@
+#!/bin/csh 
+
+# we are tempoarily removing 2 irrelevant dynamic loader variable
+# messages on macs on newer macs until we find a way to work around
+# these mesgs.  We run this before comparing the output of pintool
+# tests to the "reference" output.
+
+# Messages are:
+# dyld: warning environment variable DYLD_FORCE_FLAT_NAMESPACE=1 ignored for setuid binary
+# dyld: warning environment variable DYLD_SHARED_REGION=avoid ignored for setuid binary
+
+
+grep -v dyld $1  > $1.$$.out2
+grep -v dyld $2  > $2.$$.out2
+cmp $1.$$.out2 $2.$$.out2
+set s=$status
+rm $1.$$.out2 $2.$$.out2
+exit($s)

@@ -1,0 +1,20 @@
+#! /bin/bash
+
+# This script gets two arguments:
+# 1) An operand (eq/ne/has) 
+# 2) A name (in lowercase)
+# and returns the result of the comparison.
+#
+# Example usage:
+# To test whether the host name has tgl in it, run the following command:
+# testHostName has tgl
+
+host_name=`hostname`
+
+case $1 in
+    "eq" )   if [[ $host_name == $2 ]]; then echo 1; else echo 0; fi ;;
+    "ne" )   if [[ $host_name == $2 ]]; then echo 0; else echo 1; fi ;;
+    "has" )  if [[ $host_name == *$2* ]]; then echo 1; else echo 0; fi ;;
+    * )     echo "Bad argument $1 (should be eq/ne/has) " ;;
+esac
+

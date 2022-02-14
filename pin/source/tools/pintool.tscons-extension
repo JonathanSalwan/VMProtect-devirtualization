@@ -1,0 +1,578 @@
+"""
+This plugin extension allows a project file to easily build Pin tools.
+To use this extension, a project file can define the following elements:
+
+  PINHOME = '...'
+  PINTOOLS = [...]
+  PINLIBRARIES = [...]
+
+The following variables are also available to the project file:
+
+  $PIN            Expands to the pathname to Pin, the program you should
+                   run to launch Pin.  It is either absolute, or relative
+                   to the project file, depending on PINHOME.
+  $PINTOOL(os,x)  Expands to the name of a Pin tool whose root name is "x",
+                   using the naming conventions on the OS whose name is "os".
+  $PINTOOL(x)     Equivalent to $PINTOOL($HOSTOS,x).
+  $PINHOME_TYPE   Expands to either "kit" or "source", depending on whether
+                   PINHOME points to a Pin kit or source tree.
+
+PINHOME should be set to the pathname of a Pin distribution kit.  If you are
+a Pin developer, you may also set PINHOME to the root of the Pin source tree.
+The pathname can either be absolute or relative to the project file.
+
+PINTOOLS defines the list of Pin tools to build.  Format looks like this:
+
+  PINTOOLS = [
+      {'name': 'mytool',
+          'files': [
+              {'file': 'mytool.cpp'},
+              {'file': 'foo.cpp'},
+          ],
+      },
+      {'name': 'myothertool',
+          'files': [
+              {'file': 'other.cpp'},
+          ],
+      },
+  ]
+
+PINLIBRARIES can optionally be used to build a library that will later
+be linked into a Pin tool.  Its format is similar to LIBRARIES, but you
+cannot use the 'libtypes' key.
+
+  PINLIBRARIES = [
+      {'name': 'mylib',
+          'files': [
+              {'file': 'mylib1.cpp'},
+              {'file': 'mylib2.cpp'},
+          ],
+      },
+  ]
+
+This extension reads the PINTOOLS and PINLIBRARIES sections after the
+project's PRECOMMANDS section is executed, so PRECOMMANDS can legally
+add content to PINTOOLS and PINLIBRARIES.  The variable values are set
+before PRECOMMANDS, so they are available to these commands.  The value
+of PINHOME must be set prior to PRECOMMANDS and may not change afterwards.
+"""
+
+
+import os
+import tsconsapi
+import sel
+
+
+# Maps a 'proj' handle to a 2-tuple (pinhome, pintype).  Where
+# 'pinhome' is the value of PINHOME, captured in APPLY_EARLY, and
+# 'pintype' is the type of that Pin tree.
+#
+PinToolDefs = {}
+
+
+def APPLY_EARLY(proj, namespace):
+    """
+    Execute the "early" phase for this plugin extension.  The early
+    phase happens before the project's PRECOMMANDS are executed.
+
+    @param proj:        Handle to a TSCons project.
+    @type proj:         Unspecified handle type.
+    @param namespace:   Namespace of the project file
+    @type namespace:    Handle returned from 'import'.
+    """
+
+    # Issue an error if we don't know how to build Pin tools for this target.
+    #
+    if 'PINTOOLS' in namespace or 'PINLIBRARIES' in namespace:
+        if not ExtensionSupportsTarget(proj):
+            tsconsapi.Abort("Project '" + tsconsapi.ProjName(proj) + "' uses TSCons 'pintool' extension, "
+                "but that extension is not supported for this target.")
+
+    # If there is a PINHOME, figure out the type (kit vs. source tree).  Create
+    # project variables in the "early" phase, so they are available to the
+    # project's PRECOMMANDS.
+    #
+    pinHome = namespace.get('PINHOME')
+    pinType = None
+    if pinHome:
+        pinHome = tsconsapi.SubstituteVariables(proj, pinHome)
+        pinType = IdentifyPinType(proj, pinHome)
+        if not pinType:
+            tsconsapi.Abort("Project '" + tsconsapi.ProjName(proj) +
+                "', PINHOME does not look like a Pin source or kit tree.")
+        tsconsapi.AddProjVarSimple(proj, 'PINHOME_TYPE', pinType)
+        tsconsapi.AddProjVarSimple(proj, 'PIN', GetPinPath(proj, pinHome, pinType))
+
+    # All projects get a definition of $PINTOOL(x).
+    #
+    tsconsapi.AddProjVarFunc(proj, 'PINTOOL', CalculatePintoolVar)
+
+    # Save the value of PINHOME, so we can get it later in APPLY_LATE().
+    #
+    global PinToolDefs
+    PinToolDefs[proj] = (pinHome, pinType)
+
+
+def APPLY_LATE(proj, namespace):
+    """
+    Execute the "late" phase for this plugin extension.  The late
+    phase happens after the project's PRECOMMANDS are executed.
+
+    @param proj:        Handle to a TSCons project.
+    @type proj:         Unspecified handle type.
+    @param namespace:   Namespace of the project file
+    @type namespace:    Handle returned from 'import'.
+    """
+
+    # Get the value of PINHOME that we captured in APPLY_EARLY.  Make sure it hasn't
+    # changed.
+    #
+    (pinHome, pinType) = PinToolDefs[proj]
+    pinHomeLate = namespace.get('PINHOME')
+    if pinHomeLate:
+        pinHomeLate = tsconsapi.SubstituteVariables(proj, pinHomeLate)
+    if pinHome != pinHomeLate:
+        tsconsapi.Abort("Project '" + tsconsapi.ProjName(proj) +
+            "', Value of PINHOME changed during PRECOMMANDS from '" +
+            pinHome + "' to '" + pinHomeLate + "'.")
+
+    # Create build rules from the PINTOOLS and PINLIBRARIES sections.  We
+    # do this in the "late" phase so that PRECOMMANDS can add dynamic content
+    # to these sections.
+    #
+    if 'PINTOOLS' in namespace:
+        ApplyPintools(proj, namespace, pinHome, pinType)
+    if 'PINLIBRARIES' in namespace:
+        ApplyPinlibraries(proj, namespace)
+
+
+
+# ------------- Private -------------
+
+def ExtensionSupportsTarget(proj):
+    """
+    Determine if we know how to build Pin tools for the current target.
+
+    @param proj:        Handle to a TSCons project.
+    @type proj:         Unspecified handle type.
+
+    @return:    TRUE if building Pin tools is supported.
+    @rtype:     Boolean.
+    """
+
+    cpu = tsconsapi.SubstituteVariables(proj, '$TARGETCPU')
+    os = tsconsapi.SubstituteVariables(proj, '$TARGETOS')
+
+    # This extension probably does not need to change in order to support BSD on IA32.
+    # However, there's no Pin yet for that target, so it's impossible to test.
+    #
+    if os  == 'linux' and cpu in ['ia32', 'intel64']:
+        return True
+    if os  == 'windows' and cpu in ['ia32', 'intel64']:
+        return True
+    if os == 'bsd' and cpu in ['intel64']:
+        return True
+    if os  == 'mac' and cpu in ['ia32', 'intel64']:
+        return True
+    return False
+
+
+def ApplyPintools(proj, namespace, pinHome, pinType):
+    """
+    Process the PINTOOLS section of a project.
+
+    @param proj:        Handle to a TSCons project.
+    @type proj:         Unspecified handle type.
+    @param namespace:   Namespace of the project file
+    @type namespace:    Handle returned form 'import'.
+    @param pinHome:     The value of PINHOME, or the empty string if it isn't defined.
+    @type pinHome:      String.
+    @param pinType:     Either "kit" or "source", depending on what PINHOME refers to.
+    @type pinType:      String.
+    """
+
+    pintools = namespace.get('PINTOOLS')
+    if not pinHome:
+        tsconsapi.Abort("Project '" + tsconsapi.ProjName(proj) + "' must specify PINHOME.")
+
+    includes = namespace.get('INCLUDES')
+    if includes == None:
+        includes = []
+        namespace['INCLUDES'] = includes
+    defines = namespace.get('DEFINES')
+    if defines == None:
+        defines = []
+        namespace['DEFINES'] = defines
+    libs = namespace.get('LIBRARIES')
+    if libs == None:
+        libs = []
+        namespace['LIBRARIES'] = libs
+
+    if pinType == 'source':
+        ApplyPintoolsToSource(pinHome, pintools, includes, defines, libs)
+    elif pinType == 'kit':
+        ApplyPintoolsToKit(pinHome, pintools, includes, defines, libs)
+
+
+def ApplyPinlibraries(proj, namespace):
+    """
+    Process the PINLIBRARIES section of a project.
+
+    @param proj:        Handle to a TSCons project.
+    @type proj:         Unspecified handle type.
+    @param namespace:   Namespace of the project file
+    @type namespace:    Handle returned form 'import'.
+    """
+
+    pinlibs = namespace.get('PINLIBRARIES')
+    libs = namespace.get('LIBRARIES')
+    if libs == None:
+        libs = []
+        namespace['LIBRARIES'] = libs
+
+    for lib in pinlibs:
+        if not 'name' in lib:
+            tsconsapi.Abort("PINLIBRARIES element must contain 'name'.")
+        name = lib['name']
+        opts = lib.get('toolchain-options', [])
+        files = lib.get('files', None)
+        selector = lib.get('selector', None)
+        outdir = lib.get('outdir', None)
+        noprefix = lib.get('noprefix', None)
+
+        ApplyCommonOptionsForPinToolsAndLibraries(opts)
+
+        # We require libraries that are linked into Pin tools to be static for now.
+        # On Windows, there are restrictions that prevent tools from using DLL libraries.
+        #
+        libtypes = [{'libtype': 'static'}]
+
+        rec = {'name': name, 'toolchain-options': opts, 'libtypes': libtypes}
+        if files:
+            rec['files'] = files
+        if selector:
+            rec['selector'] = selector
+        if outdir:
+            rec['outdir'] = outdir
+        if noprefix:
+            rec['noprefix'] = noprefix
+        libs.append(rec)
+
+
+def CalculatePintoolVar(name, params):
+        """
+        Calculate the value of a $PINTOOL(os,x) or $PINTOOL(x) variable expansion.
+
+        @param name:    The name "PINTOOL".
+        @type name:     String.
+        @param params:  Tuple containing the parameters of the $PINTOOL variable.
+        @type params:   Tuple of strings.
+
+        @return:    Value for the variable expansion.
+        @rtype:     String.
+        """
+
+        # If there is only 1 parameter, the "os" defaults to $HOSTOS.  Return a
+        # string with the 2-parameter macro call.  It will be re-expanded.
+        #
+        if len(params) == 1:
+            return '$PINTOOL($HOSTOS,' + params[0] + ')'
+
+        if len(params) != 2:
+            tsconsapi.Abort("$PINTOOL must take 1 or 2 parameters.")
+
+        os = params[0]
+        name = params[1]
+        if os == 'windows':
+            return name + '.dll'
+        if os == 'linux' or os == 'bsd':
+            return name + '.so'
+        if os == 'mac':
+            return name + '.dylib'
+        tsconsapi.Abort("Illegal OS value in '$PINTOOL(" + os + ", " + name + ")'.")
+
+
+def IdentifyPinType(proj, pinhome):
+    """
+    Identify the type of the Pin home area.
+
+    @param proj:        Handle to a TSCons project.
+    @type proj:         Unspecified handle type.
+    @param pinhome:     Pathname to the Pin home area, relative to the project directory.
+    @type pinhome:      String.
+
+    @return:    Either 'kit', 'source', or '' telling the type of the Pin home area.
+                 The empty string means we can't tell.
+    @rtype:     String.
+    """
+
+    pinhomeRoot = tsconsapi.TranslateProjRelativeToRootRelative(proj, pinhome)
+
+    try:
+        files = os.listdir(pinhomeRoot)
+    except:
+        return ''
+
+    if 'source' in files and 'extras' in files:
+        return 'kit'
+    if 'PinTools' in files and 'Misc' in files and 'External' in files:
+        return 'source'
+    return ''
+
+
+def ApplyPintoolsToSource(pinhome, pintools, includes, defines, libs):
+    """
+    Process PINTOOLS for a Pin source tree.
+
+    @param pinhome:     Pathname to the Pin source tree, relative to the project directory.
+    @type pinhome:      String.
+    @param pintools:    PINTOOLS section of project file.
+    @type pintools:     List.
+    @param includes:    INCLUDES section of project file.
+    @type includes:     List.
+    @param defines:     DEFINES section of project file.
+    @type defines:      List.
+    @param libs:        LIBRARIES section of project file.
+    @type libs:         List.
+    """
+
+    includes.append({'dir': pinhome + '/PinTools/Include'})
+    includes.append({'dir': pinhome + '/PinTools/InstLib'})
+    includes.append({'dir': pinhome + '/build/Source/xed/xed-gcc-pin-$TARGETOS-$TARGETCPU/xed-kit/include/xed',
+        'selector': sel.TargetLinuxX86 + ' or ' + sel.TargetBsdX86})
+    includes.append({'dir': pinhome + '/build/Source/xed/xed-clang-pin-$TARGETOS-$TARGETCPU/xed-kit/include/xed', 'selector': sel.TargetMacX86})
+    includes.append({'dir': pinhome + '/build/Source/xed/xed-msvc-pin-$TARGETOS-$TARGETCPU/xed-kit/include/xed', 'selector': sel.TargetWindowsX86})
+    includes.append({'dir': pinhome + '/Source/atomic/00-export-include'})
+    includes.append({'dir': pinhome + '/Source/barecrt/00-export-include', 'selector': sel.TargetUnix})
+    includes.append({'dir': pinhome + '/Source/os-apis/00-export-include'})
+    includes.append({'dir': pinhome + '/Source/sync/00-export-include'})
+    includes.append({'dir': pinhome + '/Source/util/00-export-include'})
+    includes.append({'dir': pinhome + '/build/Source/pin/internal-include-$TARGETOS-ia32',
+        'selector': "not " + sel.BuildIntel64})
+    includes.append({'dir': pinhome + '/build/Source/pin/internal-include-$TARGETOS-intel64',
+        'selector': sel.BuildIntel64})
+
+    ApplyCommonDefines(defines)
+
+    for tool in pintools:
+        if not 'name' in tool:
+            tsconsapi.Abort("PINTOOLS element must contain 'name'.")
+        name = tool['name']
+        files = tool.get('files', [])
+        opts = tool.get('toolchain-options', [])
+        selector = tool.get('selector', None)
+        outdir = tool.get('outdir', None)
+
+        files.append({'library': pinhome + '/build/Source/pin/pin-$TARGETOS-$TARGETCPU/$LIB_STATIC($HOSTOS,pin)'})
+        files.append({'library': pinhome + '/build/Source/xed/xed-gcc-pin-$TARGETOS-$TARGETCPU/xed-kit/lib/libxed.a',
+            'selector': sel.TargetLinuxX86 + ' or ' + sel.TargetBsdX86})
+        files.append({'library': pinhome + '/build/Source/xed/xed-clang-pin-$TARGETOS-$TARGETCPU/xed-kit/lib/libxed.a', 'selector': sel.TargetMacX86})
+        files.append({'library': pinhome + '/build/Source/xed/xed-msvc-pin-$TARGETOS-$TARGETCPU/xed-kit/lib/xed.lib', 'selector': sel.TargetWindowsX86})
+
+
+        files.append({'library': pinhome + '/External/pindwarf/$(TARGETOS)/$(TARGETCPU)/libpindwarf.a', 'selector': sel.TargetLinux})
+
+        files.append({'library': pinhome + '/build/Source/pin/pin-$TARGETOS-$TARGETCPU/pinvm.lib', 'selector': sel.TargetWindows})
+
+        opts.append({'option': 'linker_flags=-Wl,--version-script=$PATH(' + pinhome + '/PinTools/Include/pintool.ver)',
+            'selector': sel.TargetLinux + ' or ' + sel.TargetBsd})
+        opts.append({'option': 'linker_flags=-Wl,-exported_symbols_list -Wl,$PATH(' + pinhome + '/PinTools/Include/pintool.exp)',
+            'selector': sel.TargetMac})
+
+        ApplyCommonFiles(files)
+        ApplyCommonOptionsForPinToolsAndLibraries(opts)
+        ApplyCommonOptionsForPinTools(opts)
+
+        rec = {'name': name, 'noprefix': True, 'files': files, 'toolchain-options': opts, 'libtypes': [{'libtype': 'shared'}]}
+        if selector:
+            rec['selector'] = selector
+        if outdir:
+            rec['outdir'] = outdir
+        libs.append(rec)
+
+
+def ApplyPintoolsToKit(pinhome, pintools, includes, defines, libs):
+    """
+    Process PINTOOLS for a Pin kit tree.
+
+    @param pinhome:     Pathname to the Pin kit, relative to the project directory.
+    @type pinhome:      String.
+    @param pintools:    PINTOOLS section of project file.
+    @type pintools:     List.
+    @param includes:    INCLUDES section of project file.
+    @type includes:     List.
+    @param defines:     DEFINES section of project file.
+    @type defines:      List.
+    @param libs:        LIBRARIES section of project file.
+    @type libs:         List.
+    """
+
+    includes.append({'dir': pinhome + '/source/include/pin'})
+    includes.append({'dir': pinhome + '/source/include/pin/gen'})
+    includes.append({'dir': pinhome + '/extras/xed-$TARGETCPU/include/xed', 'selector': sel.TargetX86})
+    includes.append({'dir': pinhome + '/extras/components/include'})
+    includes.append({'dir': pinhome + '/source/tools/InstLib'})
+
+    ApplyCommonDefines(defines)
+
+    for tool in pintools:
+        if not 'name' in tool:
+            tsconsapi.Abort("PINTOOLS element must contain 'name'.")
+        name = tool['name']
+        files = tool.get('files', [])
+        opts = tool.get('toolchain-options', [])
+        selector = tool.get('selector', None)
+        outdir = tool.get('outdir', None)
+
+        files.append({'library': pinhome + '/$TARGETCPU/lib/$LIB_STATIC($HOSTOS,pin)'})
+        files.append({'library': pinhome + '/extras/xed-$TARGETCPU/lib/libxed.a', 'selector': sel.TargetUnixX86})
+        files.append({'library': pinhome + '/extras/xed-$TARGETCPU/lib/xed.lib', 'selector': sel.TargetWindowsX86})
+
+        files.append({'library': pinhome + '/External/pindwarf/$(TARGETOS)/$(TARGETCPU)/libpindwarf.a', 'selector': sel.TargetLinux})
+
+        files.append({'library': pinhome + '/$TARGETCPU/lib/pinvm.lib', 'selector': sel.TargetWindows})
+
+        # On Unix targets, limit the symbols that are exported from the tool's shared library.
+        #
+        opts.append({'option': 'linker_flags=-Wl,--version-script=$PATH(' + pinhome + '/source/include/pin/pintool.ver)',
+            'selector': sel.TargetLinux + ' or ' + sel.TargetBsd})
+        opts.append({'option': 'linker_flags=-Wl,-exported_symbols_list -Wl,$PATH(' + pinhome + '/source/include/pin/pintool.exp)',
+            'selector': sel.TargetMac})
+
+        ApplyCommonFiles(files)
+        ApplyCommonOptionsForPinToolsAndLibraries(opts)
+        ApplyCommonOptionsForPinTools(opts)
+
+        rec = {'name': name, 'noprefix': True, 'files': files, 'toolchain-options': opts, 'libtypes': [{'libtype': 'shared'}]}
+        if selector:
+            rec['selector'] = selector
+        if outdir:
+            rec['outdir'] = outdir
+        libs.append(rec)
+
+
+def ApplyCommonDefines(defines):
+    """
+    Add content to the project's DEFINES section that is common for all Pin types.
+
+    @param defines:     DEFINES section of project file.
+    @type defines:      List.
+    """
+
+    defines.append({'macro': 'HOST_IA32', 'selector': sel.HostIA32})
+    defines.append({'macro': 'HOST_IA32E', 'selector': sel.HostIntel64})
+    defines.append({'macro': 'TARGET_IA32', 'selector': sel.TargetIA32})
+    defines.append({'macro': 'TARGET_IA32E', 'selector': sel.TargetIntel64})
+    defines.append({'macro': 'TARGET_LINUX', 'selector': sel.TargetLinux})
+    defines.append({'macro': 'TARGET_WINDOWS', 'selector': sel.TargetWindows})
+    defines.append({'macro': 'TARGET_MAC', 'selector': sel.TargetMac})
+    defines.append({'macro': 'TARGET_BSD', 'selector': sel.TargetBsd})
+
+
+def ApplyCommonFiles(files):
+    """
+    Add content to the 'files' list for a Pin tool that is common for all Pin types.
+
+    @param files:   File list for a Pin tool.
+    @param files:   List.
+    """
+
+    # These libraries are found using the default library search path on Windows.
+    #
+    files.append({'library-from-path': 'libcpmt.lib', 'selector': sel.TargetWindows})
+    files.append({'library-from-path': 'libcmt.lib', 'selector': sel.TargetWindows})
+    files.append({'library-from-path': 'kernel32.lib', 'selector': sel.TargetWindows})
+
+
+def ApplyCommonOptionsForPinToolsAndLibraries(opts):
+    """
+    Add content to the 'toolchain-options' list for a Pin tool or library.
+
+    @param opts:    Option list for a Pin tool.
+    @type opts:     List.
+    """
+
+    opts.append({'option': 'pinflags=1'})
+
+    # Tools on IA32 Linux and BSD are not compiled PIC even though they are shared libraries.
+    # The reason for this is that the compiler generates a call to a small thunk to materialize
+    # the PC for PIC code.  If this call occurs in an analysis routine, it prevents Pin from
+    # inlining the routine.  Therefore, we disable PIC as an optimization.  Instead, the linker
+    # will generate dynamic relocations to compensate for any non-PIC code.
+    #
+    # We only do this on IA32 because on Intel64, the compiler doesn't need to generate the
+    # thunk calls to materialize the PC.  Also, the Intel64 linker doesn't support dynamic
+    # relocations to compensate for non-PIC code.
+    #
+    # We don't do this on macOS* because non-PIC shared libraries are not supported on that
+    # platform.  As a result, IA32 tools that reference global variables will contain a call
+    # to the thunk, and this will prevent them from being inlined.
+    #
+    opts.append({'option': 'nopic=1', 'selector': sel.TargetLinuxIA32 + ' or ' + sel.TargetBsdIA32})
+
+
+def ApplyCommonOptionsForPinTools(opts):
+    """
+    Add content to the 'toolchain-options' list for a Pin tool that is common for all
+    Pin types.
+
+    @param opts:    Option list for a Pin tool.
+    @type opts:     List.
+    """
+
+    # This ensures that the tool uses global symbols defined in its own shared library before
+    # resolving to symbols defined in Pin.
+    #
+    opts.append({'option': 'linker_flags=-Wl,-Bsymbolic', 'selector': sel.TargetLinux + ' or ' + sel.TargetBsd})
+
+    opts.append({'option': 'linker_nostdlib=1', 'selector': sel.TargetWindows})
+    opts.append({'option': 'linker_export=main', 'selector': sel.TargetWindows})
+    opts.append({'option': 'linker_entry=Ptrace_DllMainCRTStartup@12', 'selector': sel.TargetWindowsIA32})
+    opts.append({'option': 'linker_entry=Ptrace_DllMainCRTStartup', 'selector': sel.TargetWindowsIntel64})
+    opts.append({'option': 'linker_base=0x55000000', 'selector': sel.TargetWindowsIA32})
+    opts.append({'option': 'linker_base=0xC5000000', 'selector': sel.TargetWindowsIntel64})
+
+
+def GetPinPath(proj, pinHome, pinType):
+    """
+    Get the pathname to the Pin launcher.
+
+    @param proj:        Handle to a TSCons project.
+    @type proj:         Unspecified handle type.
+    @param pinHome:     The value of PINHOME.
+    @type pinHome:      String.
+    @param pinType:     Either "kit" or "source", depending on what PINHOME refers to.
+    @type pinType:      String.
+
+    @return:    Pathname to the Pin launcher, relative to the project file or absolute.
+    @rtype:     String.
+    """
+
+    cpu = tsconsapi.SubstituteVariables(proj, '$TARGETCPU')
+    os = tsconsapi.SubstituteVariables(proj, '$TARGETOS')
+
+    # This is the Pin launcher in all Pin kits.
+    #
+    if pinType == 'kit':
+        if os == 'windows':
+            return pinHome + '/pin.bat'
+        else:
+            return pinHome + '/pin'
+
+    # When building out of a source tree, we use these scripts to launch
+    # Pin on systems where the tool links against shared libraries.
+    # The script sets the library load path to find the libraries in 
+    # the source tree.
+    #
+    if os == 'linux' and cpu == 'ia32':
+        return pinHome + '/Source/pin/pin-runner-linux-ia32.sh'
+    if os == 'linux' and cpu == 'intel64':
+        return pinHome + '/Source/pin/pin-runner-linux-intel64.sh'
+
+    # On systems where the tool does not link against shared libraries, we
+    # can invoke the Pin binary directly.
+    #
+    if os == 'windows':
+        return pinHome + '/build/Source/pin/pin-' + os + '-' + cpu + '/pin.exe'
+    else:
+        return pinHome + '/build/Source/pin/pin-' + os + '-' + cpu + '/pin'

@@ -1,0 +1,28 @@
+#! /bin/bash
+
+
+# This script gets two arguments:
+# 1) An operand (eq/ne/ge/gt/le/lt) 
+# 2) A version number 
+# and returns the result of the comparison.
+#
+# Example usage:
+# To test whether the linux kernel version is == 4.3.0 , run the following command:
+# testLinuxKernelVersion eq 4.3.0 
+
+# this function takes a string in version format (s.a 2.6.16) and makes it an integer (00020006001600000000)
+function digit_version { echo $1 | awk -F. '{ printf("%04d%04d%04d\n", $1, $2, $3); }'; }
+
+script_dir=`dirname $0`
+dist_ver=$(digit_version "`$script_dir/printLinuxKernelVersion`")
+arg_ver=$(digit_version $2)
+
+case $1 in
+    "eq" )  if [ $dist_ver -eq $arg_ver ]; then echo 1; else echo 0; fi;;
+    "ne" )  if [ $dist_ver -ne $arg_ver ]; then echo 1; else echo 0; fi;;
+    "lt" )  if [ $dist_ver -lt $arg_ver ]; then echo 1; else echo 0; fi;;
+    "le" )  if [ $dist_ver -le $arg_ver ]; then echo 1; else echo 0; fi;;
+    "gt" )  if [ $dist_ver -gt $arg_ver ]; then echo 1; else echo 0; fi;;
+    "ge" )  if [ $dist_ver -ge $arg_ver ]; then echo 1; else echo 0; fi;;
+    * )     echo "Bad argument $1 (should be eq/ne/ge/gt/le/lt) " ;;
+esac

@@ -1,0 +1,7 @@
+#! /bin/bash
+
+# this function takes a string in version format (s.a 2.6.16) and makes it an integer (00020006001600000000)
+function digit_version { echo $1 | awk -F. '{ printf("%04d%04d%04d\n", $1, $2, $3); }'; }
+
+#now we use digit_version to compare between the current version and the given one
+if [[ $(digit_version "`uname -r| egrep -o "[1-9]{1}\.[1-9]{1}(\.[0-9]*)?" | head -1`") < $(digit_version $1) ]]; then echo 1; else echo 0; fi

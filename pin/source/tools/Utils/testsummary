@@ -1,0 +1,6 @@
+#! /bin/sh
+find . -name '*.failed'
+tested=`find . -name '*.tested' | wc | awk '{print $1;}'`
+failed=`find . -name '*.failed' | wc | awk '{print $1;}'`
+echo "SUMMARY:  failures $failed/$tested timing 0.0"
+exit $failed

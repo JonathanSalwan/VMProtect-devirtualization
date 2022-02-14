@@ -1,0 +1,23 @@
+#! /bin/bash
+
+#
+# Run the given command for 500 times. Stops if the command fails.
+# Usage example: run_many "make inscount1.test"
+#
+
+echo ""
+echo "****************************************************"
+echo "*** Going to run the above command for 500 times ***"
+echo "****************************************************"
+
+for ((  i = 0 ;  i <= 500;  i++  ))
+do
+  echo ""
+  echo "Run number $i:"
+  echo "Line to run $1"
+  $1
+  if [ $? -ne 0 ]
+  then
+  exit 1
+  fi
+done

@@ -1,0 +1,305 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file contains the following:
+# 1. All the common make targets which depend on the variables defined
+#    in the per-directory makefile.rules files. The independent targets
+#    are defined in makefile.config in this directory.
+# 2. Default rules for building pintools and test applications.
+# 3. Default test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# make targets
+#
+##############################################################
+
+###### Finalize definitions - add prefixes and suffixes ######
+
+SERIAL := $(SERIAL_SUBSET:%=%.wrap)
+TESTS := $(TEST_TOOL_ROOTS:%=%.wrap) $(TEST_ROOTS:%=%.wrap)
+TESTS := $(filter-out $(SERIAL), $(TESTS))
+SANITY := $(SANITY_SUBSET:%=%.wrap)
+SANITY := $(filter-out $(SERIAL), $(SANITY))
+TOOLS := $(TEST_TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX)) $(TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX))
+SA_TOOLS := $(SA_TOOL_ROOTS:%=$(OBJDIR)%$(SATOOL_SUFFIX))
+APPS := $(APP_ROOTS:%=$(OBJDIR)%$(EXE_SUFFIX))
+OBJECTS := $(OBJECT_ROOTS:%=$(OBJDIR)%$(OBJ_SUFFIX))
+DLLS := $(DLL_ROOTS:%=$(OBJDIR)$(DLL_PREFIX)%$(DLL_SUFFIX))
+LIBS := $(LIB_ROOTS:%=$(OBJDIR)%$(LIB_SUFFIX))
+
+###### Create the output directory ######
+
+# Create the output directory.
+dir: $(OBJDIR)
+
+print_filtered_tests:
+	-@$(PYTHON) $(TOOLS_ROOT)/Utils/printFilteredTests.py --unfiltered_tests "$(RUNNABLE_TESTS)" --tests "$(TESTS) $(SERIAL)"
+
+print_filtered_sanity_tests:
+	-@$(PYTHON) $(TOOLS_ROOT)/Utils/printFilteredTests.py --unfiltered_tests "$(RUNNABLE_TESTS)" --tests "$(SANITY) $(SERIAL)"
+
+obj-%:
+	mkdir -p $@
+
+# Add the output directory as an order-only dependency to all the binaries and tests.
+# Order-only dependencies are all the dependencies that follow the "|" character.
+# These dependencies do not mandate rebuilding the target if the dependency changed,
+# only that the dependended-on file exists.
+# In this case, we require that $(OBJDIR) exist, but we don't care if it has changed.
+$(TEST_TOOL_ROOTS:%=%.test) $(TEST_ROOTS:%=%.test): %: | dir
+$(TESTS) $(SANITY) $(SERAIL): %: | dir
+$(TOOLS) $(TOOLS:%$(PINTOOL_SUFFIX)=%$(OBJ_SUFFIX)) $(SA_TOOLS) $(SA_TOOLS:%$(SATOOL_SUFFIX)=%$(OBJ_SUFFIX)): %: | dir
+$(APPS) $(OBJECTS) $(DLLS) $(LIBS): %: | dir
+
+###### Build ######
+
+# Build the tools.
+tools: dir $(TOOLS) $(SA_TOOLS)
+
+# Build the applications.
+apps: dir $(APPS)
+
+# Build the additional object files.
+objects: dir $(OBJECTS)
+
+# Build the additional dlls.
+dlls: dir $(DLLS)
+
+# Build the static libraries.
+libs: dir $(LIBS)
+
+# Build the program which checks the hardware for avx support.
+avxcheck: $(CHECKAVX)
+
+# Build the program which checks the hardware for avx2 support.
+avx2check: $(CHECKAVX2)
+
+# Build the program which checks the hardware for tsx support.
+tsxcheck: $(CHECKTSX)
+
+# Build the program which checks the hardware for avx512f support.
+avx512fcheck: $(CHECKAVX512F)
+
+# Build the program which checks the hardware and OS for amx support.
+amxcheck: $(CHECKAMX)
+
+###### Install ######
+
+# Build all and run a predefined installer where applicable.
+install: all
+	$(INSTALLER) $(INSTALL_FLAGS)
+	@echo install complete!
+
+###### Test ######
+
+# Run all tests.
+test: print_filtered_tests $(TESTS)
+
+# Run the "short" sanity list. 
+sanity: print_filtered_sanity_tests $(SANITY)
+
+# Run the "Serial" list. 
+serial: $(SERIAL)
+
+summary:
+	$(TOOLS_ROOT)/Utils/testsummary
+
+###### Cleanup ######
+
+# Remove any files that were created by the make process.
+clean:
+	-rm -rf $(OBJDIR) *.out* *.log* *.xml *.makefile.copy *.core core.*
+
+clean-remote:
+	-$(INSTALLER) $(INSTALL_FLAGS) --clean
+
+###### Build the common components - for internal use ###### 
+
+$(TESTAPP):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)cp-pin$(EXE_SUFFIX)
+
+$(HELLO_APP):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)hello$(EXE_SUFFIX)
+
+$(HELLO_APP_DWARF4):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)hello_dwarf4$(EXE_SUFFIX)
+
+$(DISABLE_ASLR):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)disable-aslr$(EXE_SUFFIX)
+
+$(ATTACH_LAUNCHER):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)attachLauncher$(EXE_SUFFIX)
+
+$(THREAD_APP):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)thread_app$(EXE_SUFFIX)
+
+$(INSCOUNT_TOOL):
+	$(MAKE) -C $(TOOLS_ROOT)/ManualExamples dir $(OBJDIR)inscount0$(PINTOOL_SUFFIX)
+
+$(CHECKAVX):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)avx_check$(EXE_SUFFIX)
+
+$(CHECKAVX2):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)avx2_check$(EXE_SUFFIX)
+
+$(CHECKAMX):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)amx_check$(EXE_SUFFIX)
+
+$(CHECKTSX):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)tsx_check$(EXE_SUFFIX)
+
+$(CHECKAVX512F):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)avx512f_check$(EXE_SUFFIX)
+
+$(THREADLIB):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)threadlib$(OBJ_SUFFIX)
+  
+$(RUNNABLE):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)runnable$(OBJ_SUFFIX)
+  
+$(THREADPOOL):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)thread_pool$(OBJ_SUFFIX)
+  
+$(SYSMEMORY):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)sys_memory$(OBJ_SUFFIX)
+
+$(REGVALLIB):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)regvallib$(LIB_SUFFIX)
+
+$(CONTROLLERLIB):
+	$(MAKE) -C $(TOOLS_ROOT)/InstLib dir $(OBJDIR)controller$(LIB_SUFFIX)
+
+$(SUPPORTS_AVX_OBJ):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)supports_avx$(OBJ_SUFFIX)
+
+$(SUPPORTS_AVX2_OBJ):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)supports_avx2$(OBJ_SUFFIX)
+
+$(SUPPORTS_AVX512F_OBJ):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)supports_avx512f$(OBJ_SUFFIX)
+
+$(SET_XMM_SCRATCHES_OBJ):
+	$(MAKE) -C $(TOOLS_ROOT)/Utils dir $(OBJDIR)set_xmm_scratches_asm$(OBJ_SUFFIX)
+
+###### Automated testing utilities - for internal use ######
+
+$(OBJDIR)%.tested:
+	touch $@
+
+#$(OBJDIR)%.failed:
+#	touch $@
+
+# Prevent these from being deleted if the test recipe fails.
+.PRECIOUS: $(OBJDIR)%.tested $(OBJDIR)%.failed
+
+# Don't delete the files generated in the Utils directory.
+.PRECIOUS: $(TESTAPP) $(HELLO_APP) $(HELLO_APP_DWARF4) $(DISABLE_ASLR) $(ATTACH_LAUNCHER) $(THREAD_APP)
+.PRECIOUS: $(CHECKAVX) $(CHECKAVX2) $(CHECKTSX) $(CHECKAVX512F) $(CHECKAMX)
+.PRECIOUS: $(THREADLIB) $(SUPPORTS_AVX_OBJ) $(SUPPORTS_AVX2_OBJ) $(SUPPORTS_AVX512F_OBJ) $(SET_XMM_SCRATCHES_OBJ)
+.PRECIOUS: $(RUNNABLE) $(THREADPOOL) $(SYSMEMORY)
+
+# Accelerate the make process and prevent errors.
+.PHONY: tools apps objects dlls libs avxcheck tsxcheck install test sanity serial summary clean %.test %.wrap
+
+##############################################################
+#
+# Default build rules
+#
+##############################################################
+
+###### Default build rules for tools ######
+
+# Build the intermediate object file.
+$(OBJDIR)%$(OBJ_SUFFIX): %.cpp
+	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+# Build the intermediate object file.
+$(OBJDIR)%$(OBJ_SUFFIX): %.c
+	$(CC) $(TOOL_CFLAGS) $(COMP_OBJ)$@ $<
+
+# Build the tool as a dll (shared object).
+$(OBJDIR)%$(PINTOOL_SUFFIX): $(OBJDIR)%$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $< $(TOOL_LPATHS) $(TOOL_LIBS)
+
+# Build the static analysis tools.
+$(SA_TOOLS): %$(SATOOL_SUFFIX): %$(OBJ_SUFFIX)
+	$(LINKER) $(SATOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(SATOOL_LPATHS) $(SATOOL_LIBS)
+
+# Don't delete the object files and dlls.
+.PRECIOUS: $(OBJDIR)%$(OBJ_SUFFIX) $(OBJDIR)%$(PINTOOL_SUFFIX)
+
+###### Default build rules for asm objects ######
+
+# Source and target have the same name.
+$(OBJDIR)%$(OBJ_SUFFIX): %$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(COMP_OBJ)$@ $<
+
+# Target name includes the string "_asm".
+$(OBJDIR)%_asm$(OBJ_SUFFIX): %$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(COMP_OBJ)$@ $<
+
+# Several source versions depending on architecture.
+$(OBJDIR)%$(OBJ_SUFFIX): %_$(TARGET)$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(COMP_OBJ)$@ $<
+
+# Same as above, but target name includes the string "_asm".
+$(OBJDIR)%_asm$(OBJ_SUFFIX): %_$(TARGET)$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(COMP_OBJ)$@ $<
+
+# Several source versions depending on OS type.
+$(OBJDIR)%$(OBJ_SUFFIX): %_$(OS_TYPE)$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(COMP_OBJ)$@ $<
+
+# Same as above, but target name includes the string "_asm".
+$(OBJDIR)%_asm$(OBJ_SUFFIX): %_$(OS_TYPE)$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(COMP_OBJ)$@ $<
+
+# Several source versions depending on architecture and OS type.
+$(OBJDIR)%$(OBJ_SUFFIX): %_$(TARGET)_$(OS_TYPE)$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(COMP_OBJ)$@ $<
+
+# Same as above, but target name includes the string "_asm".
+$(OBJDIR)%_asm$(OBJ_SUFFIX): %_$(TARGET)_$(OS_TYPE)$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(COMP_OBJ)$@ $<
+
+###### Default build rules for applications ######
+
+$(OBJDIR)%$(EXE_SUFFIX): %.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)%$(EXE_SUFFIX): %.c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS)
+
+
+##############################################################
+#
+# Default test recipes
+#
+##############################################################
+
+###### Default test rules ######
+
+# This wrapper is used by the nightly/sanity/serail testing. No need to use it outside of this file.
+# NOTE: makesure the test name is last parameter when using junit_test_wrap.py as TEST_PERFIX
+#%.wrap: $(OBJDIR) $(OBJDIR)%.tested $(OBJDIR)%.failed
+%.wrap: $(OBJDIR) $(OBJDIR)%.tested
+	touch $(OBJDIR)$(@:.wrap=.failed)
+	$(TEST_PREFIX) $(MAKE) $(MAKE_TESTFLAGS) $(@:.wrap=.test) 	
+	rm $(OBJDIR)$(@:.wrap=.failed)
+
+# Not all tools produce output so the .out file might not be created. We don't want the test to fail in this case,
+# so we ignore possible failures of the final rm command.
+%.test: $(OBJDIR) $(OBJDIR)%$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)$(@:.test=)$(PINTOOL_SUFFIX) -- $(TESTAPP) makefile $(OBJDIR)$(@:.test=.makefile.copy) \
+	  > $(OBJDIR)$(@:.test=.out) 2>&1
+	$(CMP) makefile $(OBJDIR)$(@:.test=.makefile.copy)
+	$(RM) $(OBJDIR)$(@:.test=.makefile.copy)
+	-$(RM) $(OBJDIR)$(@:.test=.out)

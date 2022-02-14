@@ -1,0 +1,64 @@
+This text file is the "third-party-programs.txt" file specified in the accompanying
+Intel Simplified Software License ("Agreement").
+All capitalized terms used but not defined in this text file have the same meaning as
+specified in the Agreement.
+
+The Third Party Programs files and the corresponding third party licenses are listed
+below. As specified in the Agreement, the listed Third Party Programs files are subject
+to the corresponding third party licenses that solely and exclusively govern Your use of
+the Third Party Programs.
+
+Full text of license terms included with this software can be found here: <installdir>/licensing
+
+List of Third Party Programs included in Pin:
+
+* Bionic libc is licensed under a BSD License, see full text in NOTICE-libc, but has been modified by Intel. The
+  modifications are licensed under the Intel Simplified Software License.
+
+* Bionic libm is licensed under a BSD License, see full text in NOTICE-libm, but has been modified by Intel. The
+  modifications are licensed under the Intel Simplified Software License.
+
+* Bionic libdl is licensed under a BSD License, see full text in NOTICE-libdl, but has been modified by Intel. The
+  modifications are licensed under the Intel Simplified Software License.
+
+* Bionic linker is licensed under a BSD License, see full text in NOTICE-linker, but has been modified by Intel.
+  The modifications are licensed under the Intel Simplified Software License.
+
+* Bionic libstdc++ is licensed under a BSD License, see full text in NOTICE-libstdc++, but has been modified by Intel.
+  The modifications are licensed under the Intel Simplified Software License.
+
+* STLport is licensed under LICENSE-STLport, but has been modified by Intel. The modifications are licensed under the
+  Intel Simplified Software License.
+
+* FreeBSD is licensed under a BSD License, see full text in LICENSE-FreeBSD, but has been modified by Intel. The
+  modifications are licensed under the Intel Simplified Software License.
+
+* LLVM compiler is licensed under the University of Illinois/NCSA Open Source License (NCSA),
+  see full text in LICENSE-llvm, but has been modified by Intel. The modifications are licensed under the
+  Intel Simplified Software License.
+
+* LLVM compiler-rt is licensed under the Apache License v2.0 with LLVM Exceptions,
+  see full text in LICENSE-Apache_LLVM, but has been modified by Intel. The modifications are licensed under the
+  Intel Simplified Software License.
+
+* LLVM clang is licensed under the Apache License v2.0 with LLVM Exceptions,
+  see full text in LICENSE-Apache_LLVM, but has been modified by Intel. The modifications are licensed under the
+  Intel Simplified Software License.
+
+* LLVM libunwind is licensed under the Apache License v2.0 with LLVM Exceptions,
+  see full text in LICENSE-Apache_LLVM, but has been modified by Intel. The modifications are licensed under the
+  Intel Simplified Software License.
+
+* LLVM libcxxabi is licensed under the Apache License v2.0 with LLVM Exceptions,
+  see full text in LICENSE-Apache_LLVM, but has been modified by Intel. The modifications are licensed under the
+  Intel Simplified Software License.
+
+* GDB XML files are licensed under the FSF All Permissive License,
+  see full text in LICENSE-fsf_all_permissive, but have been modified by Intel. The modifications are licensed under the
+  Intel Simplified Software License.
+
+* All files in, or any subdirectory of, <installdir>/source/tools/ are Sample Source Code as defined and licensed
+  under the Intel Simplified Software License.
+
+* All files in, or any subdirectory of, <installdir>/source/launcher/ are Sample Source Code as defined and licensed
+  under the Intel Simplified Software License.

@@ -1,0 +1,92 @@
+#
+# Copyright (C) 2012-2018 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file is an extension to the testing framework specific
+# to the Debugger tests directory.
+# It contains additional variables used only by the Debugger tests.
+# Below is a detailed list of the variables made available by this
+# file:
+#
+# GDB						- Path to gdb. Relevant on Unix platforms only. On
+#							  Windows this variable is empty.
+# BARE_PIN					- Path to the Pin launcher without any additional
+#							  flags.
+# PINDB						- Path to the pindb test-debugger program.
+# PINDB_LIBPATH				- Defines the locations of the necessary shared
+#							  libraries when running the pindb program.
+#							  Relevant on Unix platforms only. On Windows this
+#							  variable is empty.
+# PINDB_WITH_LIBPATH		- Path to the pindb test-debugger program, preceeded
+#							  by the library locations set in LOADER_LIBRARY_PATH.
+#							  Relevant on Unix platforms only. On Windows this
+#							  variable is identical to PINDB.
+# PINDB_USERFLAGS			- Use this to add flags to the pindb program when
+#							  running the tests.
+#							  Usage: make PINDB_USERFLAGS=<extra flags> ...
+# PINFLAGS_DEBUG			- Enable application debugging and stop in the
+#							  debugger as soon as the application is launched.
+# PINFLAGS_DEBUG_RUNFREE	- Enable application debugging bu do not stop in the
+#							  debugger. Allows the user to attach a debugger at
+#							  a later time.
+# COMPARE_EXT				- Compare file extension depending on compiler used.
+#
+##############################################################
+
+# We only support gdb on Unix platforms.
+ifeq ($(OS_TYPE),unix)
+	GDB := $(shell [ -f /usr/bin/gdb ] && echo "/usr/bin/gdb" || echo "gdb")
+endif
+
+# Suffix for the pin-launcher and the pindb executables. It may be different than $(EXE_SUFFIX)
+ifeq ($(TARGET_OS),windows)
+    PINDB_SUFFIX := .exe
+else
+    PINDB_SUFFIX :=
+endif
+
+# These variables depend on whether we're running from a kit or source.
+ifeq ($(KIT),1)
+    BARE_PIN := $(PIN_ROOT)/pin$(PINDB_SUFFIX)
+    PINDB_PATH := $(PIN_ROOT)/$(TARGET)/bin/
+
+    # On Windows LOADER_LIBRARY_PATH is not available
+    ifeq ($(OS_TYPE),unix)
+        PINDB_LIBPATH := $(PIN_ROOT)/extras/xed-$(TARGET)/lib$(PATHS_SEPERATOR)$(PIN_ROOT)/$(TARGET)/runtime/pincrt
+        PINDB_SET_LIBRARIES := $(LOADER_LIBRARY_PATH)=$(PINDB_LIBPATH)$(PATHS_SEPERATOR)$$$(LOADER_LIBRARY_PATH)
+    endif
+else
+    ifeq ($(TARGET_OS),windows)
+        BARE_PIN := $(PIN_ROOT)/build/Source/pin/pin-$(TARGET_OS)-$(TARGET)/pin$(EXE_SUFFIX)
+    else
+        BARE_PIN := $(PIN_ROOT)/Source/pin/pin-runner-$(TARGET_OS)-$(TARGET).sh
+    endif
+    PINDB_PATH := $(PIN_ROOT)/build/Source/pindb/export-$(TARGET_OS)-$(TARGET)/
+    
+    # On Windows LOADER_LIBRARY_PATH is not available
+    ifeq ($(OS_TYPE),unix)
+        PINDB_LIBPATH := $(abspath $(PIN_ROOT)/build/Source/bionic/stlport/export-$(TARGET_OS)-$(HOST_ARCH)-$(TARGET_OS)-$(TARGET)/$(TARGET))$(PATHS_SEPERATOR)
+        PINDB_LIBPATH := $(PINDB_LIBPATH)$(abspath $(PIN_ROOT)/build/Source/bionic/libm/export-$(TARGET_OS)-$(HOST_ARCH)-$(TARGET_OS)-$(TARGET)/$(TARGET))$(PATHS_SEPERATOR)
+        PINDB_LIBPATH := $(PINDB_LIBPATH)$(abspath $(PIN_ROOT)/build/Source/bionic/libdl/export-$(TARGET_OS)-$(HOST_ARCH)-$(TARGET_OS)-$(TARGET)/$(TARGET))$(PATHS_SEPERATOR)
+        PINDB_LIBPATH := $(PINDB_LIBPATH)$(abspath $(PIN_ROOT)/build/Source/bionic/libc/export-$(TARGET_OS)-$(HOST_ARCH)-$(TARGET_OS)-$(TARGET)/$(TARGET))$(PATHS_SEPERATOR)
+        PINDB_LIBPATH := $(PINDB_LIBPATH)$(PIN_ROOT)/build/Source/xed/xed-gcc-pin-$(TARGET_OS)-$(TARGET)/xed-kit/lib
+        PINDB_SET_LIBRARIES := $(LOADER_LIBRARY_PATH)=$(PINDB_LIBPATH)$(PATHS_SEPERATOR)$$$(LOADER_LIBRARY_PATH)
+    endif
+endif
+
+PINDB := $(PINDB_PATH)pindb$(PINDB_SUFFIX)
+PINDB_WITH_LIBPATH := $(PINDB_SET_LIBRARIES) $(PINDB)
+
+# These are the Pin flags needed to enable application debugging.
+PINFLAGS_DEBUG := -appdebug
+PINFLAGS_DEBUG_RUNFREE := -appdebug_enable
+
+# Compare file extensions.
+ifeq ($(ICC),1)
+    COMPARE_EXT := compareICC
+else
+    COMPARE_EXT := compare
+endif
