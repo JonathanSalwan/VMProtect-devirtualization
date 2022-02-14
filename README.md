@@ -32,7 +32,7 @@ blocks which suggests that it is possible to fully devirtualize small functions 
 
 [VMProtect](https://vmpsoft.com) is a software protection that protects code by running it through a virtual
 machine with non-standard architecture. This protection is a great playground for asm lovers
-[0, 1, 2, 3, 4, 5, 6]. Also, there are already numerous tools that attack this protection [7, 8, 9].
+[0, 1, 2, 3, 4, 5, 6, 11]. Also, there are already numerous tools that attack this protection [7, 8, 9, 12, 13].
 In 2016 we took a look at the [Tigress](https://github.com/JonathanSalwan/Tigress_protection/) software
 protection solution and managed to defeat its virtualization using symbolic execution and LLVM. This approach
 has been presented at DIMVA 2018 [10] and I wanted to test it on VMProtect. Note that there is no
@@ -505,5 +505,8 @@ Last but not least, special thanks to my mate [@0vercl0k](https://twitter.com/0v
 [08] https://github.com/archercreat/vmpfix
 [09] https://github.com/void-stack/VMUnprotect
 [10] https://github.com/JonathanSalwan/Triton/blob/master/publications/DIMVA2018-slide-deobfuscation-salwan-bardin-potet.pdf
+[11] https://whereisr0da.github.io/blog/posts/2021-02-16-vmp-3/
+[12] https://github.com/pgarba/UniTaint
+[13] https://github.com/mrexodia/VMProtectTest
 ```
 
