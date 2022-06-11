@@ -1,0 +1,5 @@
+p $eflags
+monitor clear-eflags
+invalidate-regs
+p $eflags
+q

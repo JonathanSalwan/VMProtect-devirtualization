@@ -1,0 +1,4 @@
+Breakpoint 1,\s*main.*at\s*fork.cpp:(13|14|15)
+Breakpoint 2,\s*main.*at\s*fork.cpp:16
+Breakpoint 3,\s*(.*::)*DoCommon.*at\s*fork.cpp:(31|34)
+(Program exited normally.$|\[Inferior 1 \(Remote target\) exited normally\])

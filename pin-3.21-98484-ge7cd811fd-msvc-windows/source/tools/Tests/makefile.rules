@@ -1,0 +1,621 @@
+#
+# Copyright (C) 2012-2021 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := after hello icount1 icount2 icount3 icount4 icount5 context-pc icountcheck sequence sequencecheck reg \
+                   brtaken verify bblnull sec callargs malloc new rtnNumIns rtn_create_at_dup \
+                   IARGList inscount_per_image imageLoadBackward finiRemove bblFallThrough detach imageLoad \
+                   parse_executed_rtns const_context_at_ins set_df_flag_tool clear_df_flag_tool set_status_flags_tool \
+                   trace_address
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS := icount1_jit_recursion verify-nocmov check_env jecxz helpmsg helpmsg_nofilename helpmsg_tool \
+              helpmsg_tool_nofilename on_stack_context_pc
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS := segv probe traceusage rtn_insert_call_probed tracecount smc_check multipleinstrumentation cflowcheck \
+               inscount2_mt_debuginfo
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := foobar jecxz check_env trace_address_app empty_str_app
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS := jecxz_$(TARGET) df_flag_utils_asm
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place architecture-specific definitions here ######
+
+# Place ia32-specific definitions here if they apply to all supported operating systems.
+ifeq ($(TARGET),ia32)
+    TEST_TOOL_ROOTS += alah emu checkaddress operand syntax 
+    TEST_ROOTS += test_ebx_in_exceptions emu-bridge
+    APP_ROOTS += test_ebx_in_exceptions 
+    OBJECT_ROOTS += test_ebx_in_exceptions_asm test_ebx_in_exceptions
+endif
+
+# Place intel64-specific definitions here if they apply to all supported operating systems.
+ifeq ($(TARGET),intel64)
+    TEST_TOOL_ROOTS += snprintf
+    TEST_ROOTS += snprintf_non_inlined_bridge
+endif
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS += reg_ref_inlined ifunc_tst exitProcess context_stack_and_spill ifuncmemcpy callargs_probe_tool
+    TEST_ROOTS += launcher_linux context_stack_and_spill_noinline_bridge tool_without_extension imageLoader \
+                  illegal_envp sourceLocation statdyn callargs_probe illegal_envp_probed ifunc_tst_probe helpmsg_app \
+                  helpmsg_app_nofilename
+    TOOL_ROOTS += launcher_tool ea_verifier sourceLocation_tool statdyn_tool
+    APP_ROOTS += launcher_app illegalEnvp_app sourceLocation_app statdyn_app exitProcessApp memcpy_app strcmp_app \
+                 strcmp_app
+    DLL_ROOTS += sourceLocation_img1 sourceLocation_img2
+    ifeq ($(TARGET),ia32)
+        TEST_TOOL_ROOTS += thread symOutOfBound util prefix insMix xedReg rep_ip_at_ipoint_after_tool
+        TEST_ROOTS += verify-ia32 verify-ia32-nocmov
+        APP_ROOTS += loop threadApp prefixApp insMixApp rep_ip_at_ipoint_after_app_$(OS_TYPE)
+    endif
+    ifeq ($(TARGET),intel64)
+        TEST_TOOL_ROOTS += syntax_tst
+        TEST_ROOTS += checkaddress64 injectionStack child_sig_while_execv address_override_prefix_check
+        TOOL_ROOTS += checkaddress address_override_prefix_check_tool
+        APP_ROOTS += mysetenv checkaddressapp child_sig_while_execv_app child_sig_while_execv_simple_app sampleApp \
+                     address_override_prefix_check_app
+    endif
+endif
+
+# macOS*
+ifeq ($(TARGET_OS),mac)
+    TEST_ROOTS += launcher_mac helpmsg_app helpmsg_app_nofilename
+    TOOL_ROOTS += launcher_tool
+    APP_ROOTS += launcher_app
+endif
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    TEST_TOOL_ROOTS += callargs_probe_tool reg_ref_inlined context_stack_and_spill
+    TEST_ROOTS += callargs_probe context_stack_and_spill_noinline_bridge winapp_runs_pin ifunc_win_tst
+    TOOL_ROOTS += ea_verifier ifunc_tst
+    OBJECT_ROOTS += inlined_funcs_asm
+    APP_ROOTS += foobar winapp_runs_pin correct_winapp_runs_pin_cmdline strcmp_win_app
+    ifeq ($(TARGET),ia32)
+        TEST_TOOL_ROOT += rep_ip_at_ipoint_after_tool
+        TEST_ROOTS += win-emu-bridge
+        APP_ROOTS += lasterror rep_ip_at_ipoint_after_app_$(OS_TYPE)
+    endif
+	ifeq ($(TARGET),intel64)
+	    TEST_ROOTS += address_override_prefix_check
+	    TOOL_ROOTS += address_override_prefix_check_tool
+	    APP_ROOTS += address_override_prefix_check_app 
+	endif
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+# The launcher is only relevant when running from the kit structure.
+ifneq ($(KIT),1)
+    TEST_ROOTS := $(filter-out launcher_linux launcher_mac, $(TEST_ROOTS))
+    TOOL_ROOTS := $(filter-out launcher_tool, $(TOOL_ROOTS))
+    APP_ROOTS := $(filter-out launcher_app, $(APP_ROOTS))
+endif
+
+# See JIRA PINT-4990
+TOOL_ROOTS := $(filter-out segv probe traceusage rtn_insert_call_probed tracecount smc_check multipleinstrumentation cflowcheck \
+                           inscount2_mt_debuginfo, $(TOOL_ROOTS))
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+ifeq ($(TARGET_OS),windows)
+    # For check_env see Mantis 3077.
+    TEST_ROOTS := $(filter-out check_env, $(TEST_ROOTS))
+    # See Mantis 4468
+    ifeq ($(ICC),1)
+        TEST_ROOTS := $(filter-out test_ebx_in_exceptions, $(TEST_ROOTS))
+        APP_ROOTS := $(filter-out test_ebx_in_exceptions, $(APP_ROOTS))
+        OBJECT_ROOTS := $(filter-out test_ebx_in_exceptions_asm test_ebx_in_exceptions, $(OBJECT_ROOTS))
+    endif
+endif
+
+# See mantis 4439
+# Disabled for libc 2.26
+ifeq ($(TARGET_OS),linux)
+    LIBC_VERSION_GE_2_26 := $(shell $(TOOLS_ROOT)/Utils/testLibcVersion ge 2.26)
+    ifeq ($(LIBC_VERSION_GE_2_26),1)
+        TEST_TOOL_ROOTS := $(filter-out ifuncmemcpy, $(TEST_TOOL_ROOTS))
+    endif
+endif
+
+
+###### Define the serial subset ######
+
+# Defines which tests need to be run serially as may cause issues when running in parallel 
+SERIAL_SUBSET := helpmsg_tool_nofilename helpmsg_nofilename
+
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+winapp_runs_pin.test: $(OBJDIR)winapp_runs_pin$(EXE_SUFFIX) $(OBJDIR)correct_winapp_runs_pin_cmdline$(EXE_SUFFIX) $(TESTAPP)
+	echo $(PIN) > pin_invoke.txt
+	$(OBJDIR)correct_winapp_runs_pin_cmdline$(EXE_SUFFIX) \
+	  -- $(TESTAPP) makefile $(OBJDIR)makefile.winapp_runs_pin.copy > $(OBJDIR)correct_winapp_runs_pin_cmdline.txt 
+	$(OBJDIR)winapp_runs_pin$(EXE_SUFFIX) `cat $(OBJDIR)correct_winapp_runs_pin_cmdline.txt`
+	$(CMP) makefile $(OBJDIR)makefile.winapp_runs_pin.copy
+	$(RM) $(OBJDIR)makefile.winapp_runs_pin.copy $(OBJDIR)correct_winapp_runs_pin_cmdline.txt pin_invoke.txt
+
+child_sig_while_execv.test: $(OBJDIR)child_sig_while_execv_app$(EXE_SUFFIX) $(OBJDIR)child_sig_while_execv_simple_app$(EXE_SUFFIX)
+	$(PIN) -follow_execv -- $(OBJDIR)child_sig_while_execv_app$(EXE_SUFFIX)
+
+ifuncmemcpy.test: $(OBJDIR)ifuncmemcpy$(PINTOOL_SUFFIX) $(OBJDIR)memcpy_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)ifuncmemcpy$(PINTOOL_SUFFIX) -o $(OBJDIR)ifuncmemcpy.out\
+	  -- $(OBJDIR)memcpy_app$(EXE_SUFFIX) $(OBJDIR)ifuncmemcpy.out 2>&1
+	if $(QGREP) "Ifunc memcpy" $(OBJDIR)ifuncmemcpy.out ; then \
+	    $(QGREP) "memcpy (ifunc)" $(OBJDIR)ifuncmemcpy.out ; \
+	else \
+	$(QGREP) "memcpy (normal)" $(OBJDIR)ifuncmemcpy.out ; \
+	  fi
+	$(RM) $(OBJDIR)ifuncmemcpy.out
+	
+launcher_linux.test: $(OBJDIR)launcher_tool$(PINTOOL_SUFFIX) $(OBJDIR)launcher_app$(EXE_SUFFIX)
+	env LD_LIBRARY_PATH="/usr/lib" LD_ASSUME_KERNEL=`uname -r` LD_BIND_NOW=1 LD_PRELOAD=libm.so \
+	  $(PIN) -t $(OBJDIR)launcher_tool$(PINTOOL_SUFFIX) -- $(OBJDIR)launcher_app$(EXE_SUFFIX)
+
+launcher_mac.test: $(OBJDIR)launcher_tool$(PINTOOL_SUFFIX) $(OBJDIR)launcher_app$(EXE_SUFFIX)
+	env DYLD_LIBRARY_PATH="/usr/lib" $(PIN) -t $(OBJDIR)launcher_tool$(PINTOOL_SUFFIX) -- $(OBJDIR)launcher_app$(EXE_SUFFIX)
+          
+statdyn.test: $(OBJDIR)statdyn_tool$(PINTOOL_SUFFIX) $(OBJDIR)statdyn_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)statdyn_tool$(PINTOOL_SUFFIX) -- $(OBJDIR)statdyn_app$(EXE_SUFFIX)
+
+sourceLocation.test: $(OBJDIR)sourceLocation_tool$(PINTOOL_SUFFIX) $(OBJDIR)sourceLocation_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)sourceLocation_img1$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)sourceLocation_img2$(DLL_SUFFIX)
+	$(PIN) -t $(OBJDIR)sourceLocation_tool$(PINTOOL_SUFFIX) -- $(OBJDIR)sourceLocation_app$(EXE_SUFFIX) \
+	  $(OBJDIR)$(DLL_PREFIX)sourceLocation_img1$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)sourceLocation_img2$(DLL_SUFFIX)
+
+icount1_jit_recursion.test: $(OBJDIR)icount1$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -xyzzy -max_jit_recursion_level 5 -jit_all_exits 1 -t $(OBJDIR)icount1$(PINTOOL_SUFFIX) \
+	  -- $(TESTAPP) makefile $(OBJDIR)icount1_jit_recursion.makefile.copy
+	$(DIFF) makefile $(OBJDIR)icount1_jit_recursion.makefile.copy
+	$(RM) $(OBJDIR)icount1_jit_recursion.makefile.copy
+
+illegal_envp.test: $(OBJDIR)illegalEnvp_app$(EXE_SUFFIX) $(TESTAPP)
+	$(PIN) -follow_execv -- $(OBJDIR)illegalEnvp_app$(EXE_SUFFIX) $(TESTAPP) makefile $(OBJDIR)illegal_envp.makefile.copy
+	$(CMP) makefile $(OBJDIR)illegal_envp.makefile.copy
+	$(RM) $(OBJDIR)illegal_envp.makefile.copy
+
+illegal_envp_probed.test: $(OBJDIR)illegalEnvp_app$(EXE_SUFFIX) $(TESTAPP)
+	$(PIN) -probe -follow_execv -- $(OBJDIR)illegalEnvp_app$(EXE_SUFFIX) $(TESTAPP) \
+	  makefile $(OBJDIR)illegal_envp_probed.makefile.copy
+	$(CMP) makefile $(OBJDIR)illegal_envp_probed.makefile.copy
+	$(RM) $(OBJDIR)illegal_envp_probed.makefile.copy
+
+ifunc_tst_probe.test: $(OBJDIR)ifunc_tst$(PINTOOL_SUFFIX) $(OBJDIR)strcmp_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)ifunc_tst$(PINTOOL_SUFFIX)  -probe_mode 1 -- $(OBJDIR)strcmp_app$(EXE_SUFFIX)\
+	 > $(OBJDIR)ifunc_tst_probe.out
+	# Use ldd to get the libc.so location
+	ldd $(OBJDIR)strcmp_app$(EXE_SUFFIX) | $(GREP) " /[a-z,/,\.,0-9,_,-]*/libc\.so[\.,0-9]*" -o > \
+	$(OBJDIR)ifunc_tst_probe_libc.out
+	# Use nm -D to get the list of libc.so dynamic symbols
+	nm -D `cat $(OBJDIR)ifunc_tst_probe_libc.out` > $(OBJDIR)ifunc_tst_probe_nm.out
+	# if strcmp is IFUNC symbol make sure ifunc_tst_probe tool recognize it and make sure the function
+	# is called only once
+	if $(QGREP) "i strcmp" $(OBJDIR)ifunc_tst_probe_nm.out ; then \
+	  $(GREP) "ifunc strcmp called" $(OBJDIR)ifunc_tst_probe.out -c > $(OBJDIR)ifunc_tst_probe_num_calls.out; \
+	  echo "1" > $(OBJDIR)ifunc_tst_probe_num_calls_ref_1.out; \
+	  echo "4" > $(OBJDIR)ifunc_tst_probe_num_calls_ref_4.out; \
+	  if $(CMP) $(OBJDIR)ifunc_tst_probe_num_calls.out $(OBJDIR)ifunc_tst_probe_num_calls_ref_1.out ; then\
+	    $(CMP) $(OBJDIR)ifunc_tst_probe_num_calls.out $(OBJDIR)ifunc_tst_probe_num_calls_ref_1.out; \
+	  else \
+	    $(CMP) $(OBJDIR)ifunc_tst_probe_num_calls.out $(OBJDIR)ifunc_tst_probe_num_calls_ref_4.out; \
+	  fi \
+	else \
+	  $(QGREP) "Found non IFUNC strcmp" $(OBJDIR)ifunc_tst_probe.out; \
+	fi
+	$(RM) $(OBJDIR)ifunc_tst_probe*.out
+
+ifunc_tst.test: $(OBJDIR)ifunc_tst$(PINTOOL_SUFFIX) $(OBJDIR)strcmp_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)ifunc_tst$(PINTOOL_SUFFIX) -- $(OBJDIR)strcmp_app$(EXE_SUFFIX) > $(OBJDIR)ifunc_tst.out
+	# Use ldd to get the libc.so location
+	ldd $(OBJDIR)strcmp_app$(EXE_SUFFIX) | $(GREP) " /[a-z,/,\.,0-9,_,-]*/libc\.so[\.,0-9]*" -o > \
+	$(OBJDIR)ifunc_tst_libc.out
+	# Use nm -D to get the list of libc.so dynamic symbols
+	nm -D `cat $(OBJDIR)ifunc_tst_libc.out` > $(OBJDIR)ifunc_tst_nm.out
+	# if strcmp is IFUNC symbol make sure ifunc_tst tool recognize it and make sure the function is called only once
+	if $(QGREP) "i strcmp" $(OBJDIR)ifunc_tst_nm.out ; then \
+	  $(QGREP) "Found IFUNC strcmp" $(OBJDIR)ifunc_tst.out; \
+	  $(GREP) "ifunc strcmp called" $(OBJDIR)ifunc_tst.out -c > $(OBJDIR)ifunc_tst_num_calls.out; \
+	  echo "1" > $(OBJDIR)ifunc_tst_num_calls_ref_1.out; \
+	  echo "4" > $(OBJDIR)ifunc_tst_num_calls_ref_4.out; \
+	  if $(CMP) $(OBJDIR)ifunc_tst_num_calls.out $(OBJDIR)ifunc_tst_num_calls_ref_1.out ; then\
+	    $(CMP) $(OBJDIR)ifunc_tst_num_calls.out $(OBJDIR)ifunc_tst_num_calls_ref_1.out; \
+	  else \
+	    $(CMP) $(OBJDIR)ifunc_tst_num_calls.out $(OBJDIR)ifunc_tst_num_calls_ref_4.out; \
+	  fi \
+	else \
+	  $(QGREP) "Found non IFUNC strcmp" $(OBJDIR)ifunc_tst.out; \
+	fi
+	$(RM) $(OBJDIR)ifunc_tst*.out
+
+ifunc_win_tst.test: $(OBJDIR)ifunc_tst$(PINTOOL_SUFFIX) $(OBJDIR)strcmp_win_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)ifunc_tst$(PINTOOL_SUFFIX) -- $(OBJDIR)strcmp_win_app$(EXE_SUFFIX) > $(OBJDIR)ifunc_win_tst.out
+	$(QGREP) "Found non IFUNC strcmp" $(OBJDIR)ifunc_win_tst.out
+	$(RM) $(OBJDIR)ifunc_win_tst*.out
+    
+syntax_tst.test: $(OBJDIR)syntax_tst$(PINTOOL_SUFFIX) $(OBJDIR)sampleApp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)syntax_tst$(PINTOOL_SUFFIX) -setsyntax 0 -- $(OBJDIR)sampleApp$(EXE_SUFFIX) > $(OBJDIR)setsyntax_0.out
+	$(QGREP) "call " $(OBJDIR)setsyntax_0.out
+	$(PIN) -t $(OBJDIR)syntax_tst$(PINTOOL_SUFFIX) -setsyntax 1 -- $(OBJDIR)sampleApp$(EXE_SUFFIX) > $(OBJDIR)setsyntax_1.out
+	$(QGREP) "callq" $(OBJDIR)setsyntax_1.out
+	$(PIN) -t $(OBJDIR)syntax_tst$(PINTOOL_SUFFIX) -setsyntax 2 -- $(OBJDIR)sampleApp$(EXE_SUFFIX) > $(OBJDIR)setsyntax_2.out
+	$(QGREP) "CALL_NEAR" $(OBJDIR)setsyntax_2.out
+	$(RM) $(OBJDIR)setsyntax_0.out $(OBJDIR)setsyntax_1.out $(OBJDIR)setsyntax_2.out
+
+callargs.test: $(OBJDIR)callargs$(PINTOOL_SUFFIX) $(OBJDIR)foobar$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)callargs$(PINTOOL_SUFFIX) -- $(OBJDIR)foobar$(EXE_SUFFIX)
+
+callargs_probe.test: $(OBJDIR)callargs_probe_tool$(PINTOOL_SUFFIX) $(OBJDIR)foobar$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)callargs_probe_tool$(PINTOOL_SUFFIX) -- $(OBJDIR)foobar$(EXE_SUFFIX)
+
+context_stack_and_spill.test: $(OBJDIR)context_stack_and_spill$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)context_stack_and_spill$(PINTOOL_SUFFIX) -context_at_trace 1 -compare_contexts 1 \
+	  -reverse_compare_contexts 1 -- $(TESTAPP) makefile $(OBJDIR)context_stack_and_spill.makefile.copy
+	$(CMP) makefile $(OBJDIR)context_stack_and_spill.makefile.copy
+	$(RM) $(OBJDIR)context_stack_and_spill.makefile.copy
+
+context_stack_and_spill_noinline_bridge.test: $(OBJDIR)context_stack_and_spill$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -xyzzy -inline_bridge 0 -t $(OBJDIR)context_stack_and_spill$(PINTOOL_SUFFIX) -context_at_trace 1 \
+	  -compare_contexts 1 -reverse_compare_contexts 1 \
+	    -- $(TESTAPP) makefile $(OBJDIR)context_stack_and_spill_noinline_bridge.makefile.copy
+	$(CMP) makefile $(OBJDIR)context_stack_and_spill_noinline_bridge.makefile.copy
+	$(RM) $(OBJDIR)context_stack_and_spill_noinline_bridge.makefile.copy
+
+context-pc.test: $(OBJDIR)context-pc$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)context-pc$(PINTOOL_SUFFIX) -o $(OBJDIR)context-pc.out \
+	  -- $(TESTAPP) makefile $(OBJDIR)context-pc.makefile.copy
+	$(CMP) makefile $(OBJDIR)context-pc.makefile.copy
+	$(RM) $(OBJDIR)context-pc.makefile.copy $(OBJDIR)context-pc.out
+	
+on_stack_context_pc.test: $(OBJDIR)context-pc$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -xyzzy -sa_canonical 0 -t $(OBJDIR)context-pc$(PINTOOL_SUFFIX) -o $(OBJDIR)on_stack_context_pc.out \
+	  -- $(TESTAPP) makefile $(OBJDIR)on_stack_context_pc.makefile.copy
+	$(CMP) makefile $(OBJDIR)on_stack_context_pc.makefile.copy
+	$(RM) $(OBJDIR)on_stack_context_pc.makefile.copy $(OBJDIR)on_stack_context_pc.out
+
+# This is a negative test, it should fail since PinTool is passed without extension 
+tool_without_extension.test: $(OBJDIR)callargs$(PINTOOL_SUFFIX) $(OBJDIR)foobar$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)callargs -- $(OBJDIR)foobar$(EXE_SUFFIX) > $(OBJDIR)tool_without_extension.out
+	@echo "tool_without_extension is a negative test - loading PinTool without extension should fail"
+	$(QGREP) "E: Unable to resolve tool path" $(OBJDIR)tool_without_extension.out
+	$(RM) $(OBJDIR)tool_without_extension.out
+
+verify-ia32.test: $(OBJDIR)verify$(PINTOOL_SUFFIX) $(OBJDIR)loop$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)verify$(PINTOOL_SUFFIX) -- $(OBJDIR)loop$(EXE_SUFFIX)
+
+snprintf_non_inlined_bridge.test: $(OBJDIR)snprintf$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -xyzzy -inline_bridge 0 -t $(OBJDIR)snprintf$(PINTOOL_SUFFIX) \
+	  -- $(TESTAPP) makefile $(OBJDIR)snprintf_non_inlined_bridge.makefile.copy
+	$(CMP) makefile $(OBJDIR)snprintf_non_inlined_bridge.makefile.copy
+	$(RM) $(OBJDIR)snprintf_non_inlined_bridge.makefile.copy
+
+reg.test: $(OBJDIR)reg$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)reg$(PINTOOL_SUFFIX) -- $(TESTAPP) makefile $(OBJDIR)reg.makefile.copy
+	$(CMP) makefile $(OBJDIR)reg.makefile.copy
+	$(RM) $(OBJDIR)reg.makefile.copy 
+
+reg_ref_inlined.test: $(OBJDIR)reg_ref_inlined$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -log_inline -xyzzy -logfile $(OBJDIR)reg_ref_inlined.log -t $(OBJDIR)reg_ref_inlined$(PINTOOL_SUFFIX) \
+	  -- $(TESTAPP) makefile $(OBJDIR)reg_ref_inlined.makefile.copy
+	$(CMP) makefile $(OBJDIR)reg_ref_inlined.makefile.copy
+	$(BASHTEST) `$(CGREP) "NOT INLINED" $(OBJDIR)reg_ref_inlined.log` -le "4" 
+	$(QGREP) "INLINED" $(OBJDIR)reg_ref_inlined.log
+	$(RM) $(OBJDIR)reg_ref_inlined.makefile.copy $(OBJDIR)reg_ref_inlined.log
+
+verify-ia32-nocmov.test: $(OBJDIR)verify$(PINTOOL_SUFFIX) $(OBJDIR)loop$(EXE_SUFFIX)
+	$(PIN) -xyzzy -nocmov 1 -t $(OBJDIR)verify$(PINTOOL_SUFFIX) -- $(OBJDIR)loop$(EXE_SUFFIX)
+
+verify-nocmov.test: $(OBJDIR)verify$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -xyzzy -nocmov 1 -t $(OBJDIR)verify$(PINTOOL_SUFFIX) -- $(TESTAPP) makefile $(OBJDIR)verify-nocmov.makefile.copy
+	$(CMP) makefile $(OBJDIR)verify-nocmov.makefile.copy
+	$(RM) $(OBJDIR)verify-nocmov.makefile.copy
+
+check_env.test: $(OBJDIR)hello$(PINTOOL_SUFFIX) $(OBJDIR)check_env$(EXE_SUFFIX)
+	$(OBJDIR)check_env$(EXE_SUFFIX) > $(OBJDIR)check_env.before
+	$(PIN) -t $(OBJDIR)hello$(PINTOOL_SUFFIX) -- $(OBJDIR)check_env$(EXE_SUFFIX) > $(OBJDIR)check_env.tool.after
+	$(PIN) -- $(OBJDIR)check_env$(EXE_SUFFIX) > $(OBJDIR)check_env.notool.after
+	$(CMP) $(OBJDIR)check_env.before $(OBJDIR)check_env.tool.after
+	$(CMP) $(OBJDIR)check_env.before $(OBJDIR)check_env.notool.after
+	$(RM) $(OBJDIR)check_env.before $(OBJDIR)check_env.tool.after $(OBJDIR)check_env.notool.after 
+
+emu-bridge.test: $(OBJDIR)emu$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -xyzzy -inline 0 -t $(OBJDIR)emu$(PINTOOL_SUFFIX) -- $(TESTAPP) makefile $(OBJDIR)emu-bridge.makefile.copy
+	$(CMP) makefile $(OBJDIR)emu-bridge.makefile.copy
+	$(RM) $(OBJDIR)emu-bridge.makefile.copy
+
+win-emu-bridge.test: $(OBJDIR)emu$(PINTOOL_SUFFIX) $(OBJDIR)lasterror$(EXE_SUFFIX)
+	$(PIN) -xyzzy -inline 0 -t $(OBJDIR)emu$(PINTOOL_SUFFIX) -- $(OBJDIR)lasterror$(EXE_SUFFIX)
+
+checkaddress64.test: $(OBJDIR)checkaddress$(PINTOOL_SUFFIX) $(OBJDIR)checkaddressapp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)checkaddress$(PINTOOL_SUFFIX) -- $(OBJDIR)checkaddressapp$(EXE_SUFFIX)
+
+thread.test: $(OBJDIR)thread$(PINTOOL_SUFFIX) $(OBJDIR)threadApp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)thread$(PINTOOL_SUFFIX) -- $(OBJDIR)threadApp$(EXE_SUFFIX)
+
+util.test: $(OBJDIR)util$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)util$(PINTOOL_SUFFIX) -- $(TESTAPP) makefile $(OBJDIR)util.makefile.copy
+	$(CMP) makefile $(OBJDIR)util.makefile.copy
+	$(RM) $(OBJDIR)util.makefile.copy
+
+injectionStack.test: $(OBJDIR)mysetenv$(EXE_SUFFIX) $(TESTAPP)
+	$(OBJDIR)mysetenv$(EXE_SUFFIX) $(PIN) -- $(TESTAPP) makefile $(OBJDIR)injectionStack.makefile.copy
+	$(CMP) makefile $(OBJDIR)injectionStack.makefile.copy
+	$(RM) $(OBJDIR)injectionStack.makefile.copy
+
+prefix.test: $(OBJDIR)prefix$(PINTOOL_SUFFIX) $(OBJDIR)prefixApp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)prefix$(PINTOOL_SUFFIX) -- $(OBJDIR)prefixApp$(EXE_SUFFIX)
+
+insMix.test: $(OBJDIR)insMix$(PINTOOL_SUFFIX) $(OBJDIR)insMixApp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)insMix$(PINTOOL_SUFFIX) -- $(OBJDIR)insMixApp$(EXE_SUFFIX)
+
+exitProcess.test: $(OBJDIR)exitProcess$(PINTOOL_SUFFIX) $(OBJDIR)exitProcessApp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exitProcess$(PINTOOL_SUFFIX) -- $(OBJDIR)exitProcessApp$(EXE_SUFFIX)
+
+test_ebx_in_exceptions.test: $(OBJDIR)test_ebx_in_exceptions$(EXE_SUFFIX)
+	$(SET_DLL_PATH) $(PIN) -- $(OBJDIR)test_ebx_in_exceptions$(EXE_SUFFIX)
+
+imageLoader.test: $(OBJDIR)imageLoad$(PINTOOL_SUFFIX) $(TESTAPP)
+ifeq ($(TARGET),intel64)
+	$(PIN) -t $(OBJDIR)imageLoad$(PINTOOL_SUFFIX) -l -o $(OBJDIR)imageLoader.out \
+	  -- /lib64/ld-linux-x86-64.so.2 $(TESTAPP) makefile $(OBJDIR)imageLoader.makefile.copy
+else
+	$(PIN) -t $(OBJDIR)imageLoad$(PINTOOL_SUFFIX) -l -o $(OBJDIR)imageLoader.out \
+	  -- /lib/ld-linux.so.2 $(TESTAPP) makefile $(OBJDIR)imageLoader.makefile.copy
+endif
+	$(QGREP) cp $(OBJDIR)imageLoader.out
+	$(QGREP) libc.so.6 $(OBJDIR)imageLoader.out 
+	$(RM) $(OBJDIR)imageLoader.makefile.copy $(OBJDIR)imageLoader.out 
+
+inscount_per_image.test: $(OBJDIR)inscount_per_image$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $< -o $(OBJDIR)inscount_per_image.out -- $(TESTAPP) makefile $(OBJDIR)inscount_per_image.makefile.copy
+	$(CMP) makefile $(OBJDIR)inscount_per_image.makefile.copy
+	$(RM) $(OBJDIR)inscount_per_image.makefile.copy $(OBJDIR)inscount_per_image.out
+
+rep_ip_at_ipoint_after.test: $(OBJDIR)rep_ip_at_ipoint_after_tool$(PINTOOL_SUFFIX) $(OBJDIR)rep_ip_at_ipoint_after_app_$(OS_TYPE)$(EXE_SUFFIX) 
+	$(PIN) -t $(OBJDIR)rep_ip_at_ipoint_after_tool$(PINTOOL_SUFFIX)  \
+	  -- $(OBJDIR)rep_ip_at_ipoint_after_app_$(OS_TYPE)$(EXE_SUFFIX)
+
+jecxz.test: $(OBJDIR)jecxz$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)jecxz$(EXE_SUFFIX)
+
+helpmsg.test: | $(OBJDIR)
+	$(PIN) -help -logfile $(OBJDIR)$(@:.test=.log) > $(OBJDIR)$(@:.test=.out) 2>&1
+	$(QGREP) "General switches" $(OBJDIR)$(@:.test=.out)
+	$(RM) $(OBJDIR)$(@:.test=.out)
+
+helpmsg_nofilename.test: | $(OBJDIR)
+	-$(PIN) -help -logfile > $(OBJDIR)$(@:.test=.out) 2>&1
+	$(QGREP) "E: \[tid:.*\] missing argument for -logfile" $(OBJDIR)$(@:.test=.out)
+	$(QGREP) "E:  \[tid:.*\] missing argument for -logfile" pin.log
+	$(RM) $(OBJDIR)$(@:.test=.out) pin.log
+
+helpmsg_tool.test: | $(OBJDIR)
+	$(PIN) -help -logfile $(OBJDIR)$(@:.test=.log) -t $(OBJDIR)this_tool_does_not_exist$(PINTOOL_SUFFIX) \
+	  > $(OBJDIR)$(@:.test=.out) 2>&1
+	$(QGREP) "General switches" $(OBJDIR)$(@:.test=.out)
+	$(RM) $(OBJDIR)$(@:.test=.out)
+
+helpmsg_tool_nofilename.test: | $(OBJDIR)
+	-$(PIN) -help -logfile -t $(OBJDIR)this_tool_does_not_exist$(PINTOOL_SUFFIX) > $(OBJDIR)$(@:.test=.out) 2>&1
+	$(QGREP) "E: \[tid:.*\] missing argument for -logfile" $(OBJDIR)$(@:.test=.out)
+	$(QGREP) "E:  \[tid:.*\] missing argument for -logfile" pin.log
+	$(RM) $(OBJDIR)$(@:.test=.out) pin.log
+
+helpmsg_app.test: | $(OBJDIR)
+	$(PIN) -help -logfile $(OBJDIR)$(@:.test=.log) -- $(OBJDIR)this_app_does_not_exist$(EXE_SUFFIX) \
+	  > $(OBJDIR)$(@:.test=.out) 2>&1
+	$(QGREP) "General switches" $(OBJDIR)$(@:.test=.out)
+	$(RM) $(OBJDIR)$(@:.test=.out)
+
+helpmsg_app_nofilename.test: | $(OBJDIR)
+	-$(PIN) -help -logfile -- $(OBJDIR)this_app_does_not_exist$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) 2>&1
+	$(QGREP) "E: \[tid:.*\] missing argument for -logfile" $(OBJDIR)$(@:.test=.out)
+	$(QGREP) "E:  \[tid:.*\] missing argument for -logfile" pin.log
+	$(RM) $(OBJDIR)$(@:.test=.out) pin.log
+
+trace_address.test: $(OBJDIR)trace_address$(PINTOOL_SUFFIX) $(OBJDIR)trace_address_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)trace_address$(PINTOOL_SUFFIX) -o $(OBJDIR)trace_address_tool.out -- \
+	  $(OBJDIR)trace_address_app$(EXE_SUFFIX) > $(OBJDIR)trace_address_app.out
+	$(TR) '\t' '\n' <$(OBJDIR)trace_address_tool.out | $(SORT) > $(OBJDIR)trace_address_tool.out.tmp 
+	$(TR) '\t' '\n' <$(OBJDIR)trace_address_app.out | $(SORT) > $(OBJDIR)trace_address_app.out.tmp 
+	$(CMP) $(OBJDIR)trace_address_tool.out.tmp $(OBJDIR)trace_address_app.out.tmp 
+	$(RM) $(OBJDIR)trace_address_tool.out.tmp $(OBJDIR)trace_address_app.out.tmp 
+	$(RM) $(OBJDIR)trace_address_tool.out $(OBJDIR)trace_address_app.out
+
+# invoke the test application with empty argument (test app checks argv[2] to be empty)
+empty_str.test: $(OBJDIR)empty_str_app$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)empty_str_app$(EXE_SUFFIX) "A" "" "B" > $(OBJDIR)empty_str_app.out
+	
+address_override_prefix_check.test: $(OBJDIR)address_override_prefix_check_tool$(PINTOOL_SUFFIX) $(OBJDIR)address_override_prefix_check_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)address_override_prefix_check_tool$(PINTOOL_SUFFIX)  -- \
+	  $(OBJDIR)address_override_prefix_check_app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) 2>&1
+	$(QGREP) success $(OBJDIR)$(@:.test=.out) 
+	$(RM) $(OBJDIR)$(@:.test=.out)
+	
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special tools' build rules ######
+
+$(OBJDIR)context_stack_and_spill$(PINTOOL_SUFFIX): $(OBJDIR)context_stack_and_spill$(OBJ_SUFFIX) $(SUPPORTS_AVX_OBJ)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)set_df_flag_tool$(PINTOOL_SUFFIX): $(OBJDIR)set_df_flag_tool$(OBJ_SUFFIX) $(OBJDIR)df_flag_utils_asm$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)clear_df_flag_tool$(PINTOOL_SUFFIX): $(OBJDIR)clear_df_flag_tool$(OBJ_SUFFIX) $(OBJDIR)df_flag_utils_asm$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+###### Special applications' build rules ######
+
+# This executable is currently checked in to source control. No need to rebuild it, only
+# copy it to the relevant directory.
+# The original build rule is left here as a reference.
+#
+# $(OBJDIR)winapp_runs_pin$(EXE_SUFFIX): winapp_runs_pin.cpp
+# ifeq ($(TARGET),intel64)
+#	devenv winapp_runs_pin.sln /Rebuild "Release|x64"
+#	cp x64/Release/winapp_runs_pin$(EXE_SUFFIX) $(OBJDIR)winapp_runs_pin$(EXE_SUFFIX)
+# else
+#	devenv winapp_runs_pin.sln /Rebuild "Release|ia32"
+#	cp ia32/Release/winapp_runs_pin$(EXE_SUFFIX) $(OBJDIR)winapp_runs_pin$(EXE_SUFFIX)
+# endif
+$(OBJDIR)winapp_runs_pin$(EXE_SUFFIX):
+	cp winapp_runs_pin_$(TARGET)$(EXE_SUFFIX) $(OBJDIR)winapp_runs_pin$(EXE_SUFFIX)
+
+$(OBJDIR)child_sig_while_execv_app$(EXE_SUFFIX): child_sig_while_execv_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)child_sig_while_execv_simple_app$(EXE_SUFFIX): child_sig_while_execv_simple_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)mysetenv$(EXE_SUFFIX): mysetenv.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)foobar$(EXE_SUFFIX): foobar.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)strcmp_win_app$(EXE_SUFFIX): strcmp_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)memcpy_app$(EXE_SUFFIX): memcpy_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DEBUG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) \
+	  $(DEBUG_INFO_LD_ALWAYS)
+	
+$(OBJDIR)strcmp_app$(EXE_SUFFIX): strcmp_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DEBUG_INFO_CXX_ALWAYS)$(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) \
+	  $(DEBUG_INFO_LD_ALWAYS) 
+	  
+$(OBJDIR)address_override_prefix_check_app$(EXE_SUFFIX): address_override_prefix_check_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DEBUG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) \
+	  $(DBG_INFO_LD_ALWAYS)
+	    
+
+# This application should be linked with Xed, so we add APP_LIB_XED.
+# Because the application is built with PIN libraries, we build it as
+# stand alone tool (solely because this configuration provides us an easy
+# way to build applications that is linked with PIN libraries).
+$(OBJDIR)test_ebx_in_exceptions$(EXE_SUFFIX): $(OBJDIR)test_ebx_in_exceptions$(OBJ_SUFFIX) $(OBJDIR)test_ebx_in_exceptions_xed_interface$(OBJ_SUFFIX) $(OBJDIR)test_ebx_in_exceptions_asm$(OBJ_SUFFIX)
+	$(LINKER) $(LINK_EXE)$@ $^ $(SATOOL_LDFLAGS_NOOPT) $(SATOOL_LPATHS) $(SATOOL_LIBS) $(APP_LIB_XED)
+
+$(OBJDIR)illegalEnvp_app$(EXE_SUFFIX): illegalEnvp_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)loop$(EXE_SUFFIX): loop$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(COMP_EXE)$@ $<
+
+$(OBJDIR)sampleApp$(EXE_SUFFIX): sampleApp$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(COMP_EXE)$@ $<
+
+$(OBJDIR)prefixApp$(EXE_SUFFIX): prefixApp$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS)
+
+$(OBJDIR)insMixApp$(EXE_SUFFIX): insMixApp$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS)
+
+$(OBJDIR)checkaddressapp$(EXE_SUFFIX): checkaddressapp$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(LDFLAGS_DEFAULT_NO_PIE) $(COMP_EXE)$@ $<
+
+$(OBJDIR)statdyn_app$(EXE_SUFFIX): statdyn_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) -Wl,--export-dynamic $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+  
+$(OBJDIR)rep_ip_at_ipoint_after_app_win$(EXE_SUFFIX): rep_ip_at_ipoint_after_app.c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS)
+  
+$(OBJDIR)rep_ip_at_ipoint_after_app_unix$(EXE_SUFFIX): rep_ip_at_ipoint_after_app_unix$(ASM_SUFFIX) rep_ip_at_ipoint_after_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)jecxz$(EXE_SUFFIX): $(OBJDIR)jecxz_$(TARGET)$(OBJ_SUFFIX)
+	$(LINKER) $(APP_LDFLAGS_LINK_ASM) $(LINK_EXE)$@ $(PIE) $<
+
+$(OBJDIR)trace_address_app$(EXE_SUFFIX): trace_address_app.cpp 
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) \
+	  $(DBG_INFO_LD_ALWAYS) $(APP_LIBS)
+
+$(OBJDIR)empty_str_app$(EXE_SUFFIX): empty_str_app.c
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT)
+
+###### Special objects' build rules ######
+
+# This object is part of an application, however it needs to be be built with the static MT library so we
+# use TOOL_CXXFLAGS_NOOPT instead of APP_CXXFLAGS_NOOPT.
+$(OBJDIR)test_ebx_in_exceptions$(OBJ_SUFFIX): test_ebx_in_exceptions_$(OS_TYPE).cpp
+	$(APP_CXX) $(PIC) $(SATOOL_CXXFLAGS_NOOPT) $(COMP_OBJ)$@ $<
+
+# This object is part of an application. However, it uses some Xed and Pin interfaces, so it should be
+# compiled with all the flags of a tool.
+$(OBJDIR)test_ebx_in_exceptions_xed_interface$(OBJ_SUFFIX): test_ebx_in_exceptions_xed_interface.cpp
+	$(APP_CXX) $(PIC) $(SATOOL_CXXFLAGS_NOOPT) $(COMP_OBJ)$@ $<
+
+###### Special dlls' build rules ######
+
+$(OBJDIR)$(DLL_PREFIX)sourceLocation_img1$(DLL_SUFFIX): sourceLocation_img1.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)$(DLL_PREFIX)sourceLocation_img2$(DLL_SUFFIX): sourceLocation_img2.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)
+

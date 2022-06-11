@@ -1,0 +1,4 @@
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+Squashed 3 breakpoints
+Program exited with 0

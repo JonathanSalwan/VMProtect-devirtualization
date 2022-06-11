@@ -1,0 +1,5 @@
+.*stop reason = breakpoint 1.*
+.*main.*at exec.cpp:12.*
+.*stop reason = breakpoint 2.*
+.*main.*at exec.cpp:18.*
+Process.*exited with status = 0 .*

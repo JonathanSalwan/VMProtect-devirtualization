@@ -1,0 +1,13 @@
+Stopping in Worker Thread [0-9]+$
+GlobalFunction.*at\s*thread-unix.cpp:(88|89)
+There are 3 pending breakpoints:
+  (?P<id>[0-9]+): Stopping in Worker Thread (?P=id)$
+  (?P<id>[0-9]+): Stopping in Worker Thread (?P=id)$
+  (?P<id>[0-9]+): Stopping in Worker Thread (?P=id)$
+Stopping in Worker Thread [0-9]+ last-word$
+GlobalFunction.*at\s*thread-unix.cpp:(88|89)
+Stopping in Worker Thread [0-9]+ last-word$
+GlobalFunction.*at\s*thread-unix.cpp:(88|89)
+Stopping in Worker Thread [0-9]+ last-word$
+GlobalFunction.*at\s*thread-unix.cpp:(88|89)
+(Program exited normally.$|\[Inferior 1 \(Remote target\) exited normally\])

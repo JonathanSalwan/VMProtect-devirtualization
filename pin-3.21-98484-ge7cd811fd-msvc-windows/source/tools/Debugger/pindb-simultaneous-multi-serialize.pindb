@@ -1,0 +1,14 @@
+b thread start
+b thread exit
+b GLOBAL_FUNCTION
+
+# There are 8 worker threads and each worker will stop 4 times
+# (thread-start, breakpoint at GlobalFunction(), tool breakpoint,
+# and thread-exit).  We need two more "continue" to cause the
+# process to exit.
+#
+# 33 = 8*4 + 2
+#
+c 34 verbose
+
+q

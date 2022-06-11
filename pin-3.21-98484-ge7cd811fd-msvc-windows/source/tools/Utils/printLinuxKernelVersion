@@ -1,0 +1,9 @@
+#! /bin/bash
+
+# this function prints the version number of the Linux kernel.
+# The version is retrieved from the command "uname -srm".
+# The output of this command is of this format:  "Linux <KERNEL_VER>.<MAJOR_REVISION>.<MINOR_REVISION>-<PATCH>-generic x86_64"
+# This function will return <KERNEL_VER>.<MAJOR_REVISION>.<MINOR_REVISION>
+
+dist_ver="`uname -srm | cut -d ' ' -f2 | cut -d '-' -f1`"
+echo $dist_ver

@@ -1,0 +1,23 @@
+#! /bin/bash
+
+# this function prints the version number of the Linux distribution
+# The version is retrieved from VERSION_ID="<version>" line in the /etc/*-release file.
+# On CentOS distributions, VERSION_ID contains only the major version and not the minor version,
+# so the full version is extracted from the line in format "CentOS Linux release #.#.# (Core)"
+# If there is no VERSION_ID in this file then we fall back to extracting the name from lsb_release.
+
+script_dir=`dirname $0`
+dist_name=`$script_dir/printLinuxDistName`
+
+if [[ $dist_name == 'centos' ]]; then
+    dist_ver="`find /etc/*release* -type f | xargs cat | grep 'CentOS Linux' | head -1 | sed 's/\s\s*/ /g' | cut -d ' ' -f 4`"
+fi
+
+if [ -z "$dist_ver" ]; then
+    dist_ver="`cat /etc/*-release | grep VERSION_ID | cut -d '=' -f 2 | sed 's/[ "=]//g' | head -1`"
+fi
+
+if [ -z "$dist_ver" ]; then
+    dist_ver="$(lsb_release -r | awk -F ':' '{print $2}' | awk '{print $1 }')"
+fi
+echo $dist_ver

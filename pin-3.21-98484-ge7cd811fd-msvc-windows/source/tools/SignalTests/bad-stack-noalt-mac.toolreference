@@ -1,0 +1,3 @@
+Intercepting signal SIGILL, which is an exception, application handles
+Got fatal signal SIGILL
+Program exited

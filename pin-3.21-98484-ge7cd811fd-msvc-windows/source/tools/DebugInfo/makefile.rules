@@ -1,0 +1,229 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := omit_source_location
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS :=
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS :=
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS += backtrace app_backtrace backtrace_from_dll pin_backtrace_on_assert
+    TEST_ROOTS += debug_dwarf4_jit debug_jit debug_dwarf4_probe debug_probe
+    TOOL_ROOTS += debugtest
+    APP_ROOTS += app_backtrace_app
+    DLL_ROOTS += backtrace_dll
+endif
+
+ifeq ($(TARGET_OS),mac)
+    TEST_TOOL_ROOTS += backtrace app_backtrace backtrace_from_dll pin_backtrace_on_assert
+    APP_ROOTS += app_backtrace_app
+    DLL_ROOTS += backtrace_dll
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+ifeq ($(TARGET_OS),linux)
+    DWARF4_NOT_SUPPORTED := $(shell $(TOOLS_ROOT)/Utils/testToolVersion $(CXXPATH) lt 4.5)
+    ifeq ($(DWARF4_NOT_SUPPORTED),1)
+        TEST_ROOTS := $(filter-out debug_dwarf4_jit debug_dwarf4_probe, $(TEST_ROOTS))
+    endif
+    IS_DWARF5_GCC_DEFAULT := $(shell $(TOOLS_ROOT)/Utils/testToolVersion $(CXXPATH) ge 11.1)
+    ifeq ($(IS_DWARF5_GCC_DEFAULT),1)
+        TEST_ROOTS := $(filter-out debug_jit debug_probe, $(TEST_ROOTS))
+    endif
+endif
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+# See mantis 4654
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(DIST_NAME_FEDORA),1)
+        ifeq ($(DIST_VER_GE_28),1)
+            SANITY_SUBSET := $(filter-out app_backtrace, $(SANITY_SUBSET))
+        endif
+    endif
+endif
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+debug_jit.test: $(OBJDIR)debugtest$(PINTOOL_SUFFIX) $(HELLO_APP)
+	$(PIN) -t $(OBJDIR)debugtest$(PINTOOL_SUFFIX) \
+	  -- $(HELLO_APP) > $(OBJDIR)debug_jit_test.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)debug_jit_test.out
+	$(RM) $(OBJDIR)debug_jit_test.out
+
+debug_probe.test: $(OBJDIR)debugtest$(PINTOOL_SUFFIX) $(HELLO_APP)
+	$(PIN) -probe -t $(OBJDIR)debugtest$(PINTOOL_SUFFIX) \
+	  -- $(HELLO_APP) > $(OBJDIR)debug_probe_test.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)debug_probe_test.out
+	$(RM) $(OBJDIR)debug_probe_test.out
+
+debug_dwarf4_jit.test: $(OBJDIR)debugtest$(PINTOOL_SUFFIX)  $(HELLO_APP_DWARF4)
+	$(PIN) -t $(OBJDIR)debugtest$(PINTOOL_SUFFIX) \
+	  -- $(HELLO_APP_DWARF4) > $(OBJDIR)debug_dwarf4_jit_test.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)debug_dwarf4_jit_test.out
+	$(RM) $(OBJDIR)debug_dwarf4_jit_test.out
+
+debug_dwarf4_probe.test: $(OBJDIR)debugtest$(PINTOOL_SUFFIX) $(HELLO_APP_DWARF4)
+	$(PIN) -probe -t $(OBJDIR)debugtest$(PINTOOL_SUFFIX) \
+	  --  $(HELLO_APP_DWARF4) > $(OBJDIR)debug_dwarf4_probe_test.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)debug_dwarf4_probe_test.out
+	$(RM) $(OBJDIR)debug_dwarf4_probe_test.out
+
+omit_source_location.test: $(OBJDIR)omit_source_location$(PINTOOL_SUFFIX) $(HELLO_APP)
+	$(PIN) -t $(OBJDIR)omit_source_location$(PINTOOL_SUFFIX) -e 0 \
+	  --  $(HELLO_APP) > $(OBJDIR)omit_source_location.out 2>&1
+	! ( $(PIN) -t $(OBJDIR)omit_source_location$(PINTOOL_SUFFIX) -e 1 \
+	  --  $(HELLO_APP) > $(OBJDIR)omit_source_location.out 2>&1 )
+	! ( $(QGREP) omit_source_location.cpp $(OBJDIR)omit_source_location.out )
+	$(QGREP) "<Unknown source location>" $(OBJDIR)omit_source_location.out
+	! ( $(PIN) -t $(OBJDIR)omit_source_location$(PINTOOL_SUFFIX) -e 2 \
+	  --  $(HELLO_APP) > $(OBJDIR)omit_source_location.out 2>&1 )
+	! ( $(QGREP) omit_source_location.cpp $(OBJDIR)omit_source_location.out )
+	$(QGREP) "<Unknown source location>" $(OBJDIR)omit_source_location.out
+	$(RM) $(OBJDIR)omit_source_location.out
+
+backtrace.test: $(OBJDIR)backtrace$(PINTOOL_SUFFIX) $(HELLO_APP)
+	$(PIN) -t $(OBJDIR)backtrace$(PINTOOL_SUFFIX) \
+	  --  $(HELLO_APP) > $(OBJDIR)backtrace.out 2>&1
+	$(PYCOMPARE) -p backtrace.reference -c $(OBJDIR)backtrace.out
+
+app_backtrace.test: $(OBJDIR)app_backtrace$(PINTOOL_SUFFIX)  $(OBJDIR)app_backtrace_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)app_backtrace$(PINTOOL_SUFFIX) \
+	  --  $(OBJDIR)app_backtrace_app$(EXE_SUFFIX) > $(OBJDIR)app_backtrace.out 2>&1
+	$(PYCOMPARE) -p app_backtrace.reference -c $(OBJDIR)app_backtrace.out
+	$(RM) -f $(OBJDIR)app_backtrace.out
+
+backtrace_from_dll.test: $(OBJDIR)backtrace_from_dll$(PINTOOL_SUFFIX) $(HELLO_APP)
+	$(PIN) -t $(OBJDIR)backtrace_from_dll$(PINTOOL_SUFFIX) \
+	  --  $(HELLO_APP) > $(OBJDIR)backtrace_from_dll.out 2>&1
+	$(PYCOMPARE) -p backtrace_from_dll.reference -c $(OBJDIR)backtrace_from_dll.out
+
+pin_backtrace_on_assert.test: $(OBJDIR)pin_backtrace_on_assert$(PINTOOL_SUFFIX) $(TESTAPP)
+	! ( $(PIN) -t $(OBJDIR)pin_backtrace_on_assert$(PINTOOL_SUFFIX) \
+	  -- $(TESTAPP) makefile $(OBJDIR)pin_backtrace_on_assert.makefile.copy > $(OBJDIR)pin_backtrace_on_assert.out 2>&1 )
+	$(PYCOMPARE) -p pin_backtrace_on_assert.reference -c $(OBJDIR)pin_backtrace_on_assert.out
+	$(RM) -f $(OBJDIR)pin_backtrace_on_assert.out
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special tools' build rules ######
+
+ifeq ($(TARGET_OS),linux)
+    VERSION_SCRIPT_PATTERN := -Wl,--version-script=%
+endif
+ifeq ($(TARGET_OS),mac)
+    VERSION_SCRIPT_PATTERN := -Wl,-exported_symbols_list,%
+endif
+
+# Export all symbols of this tool to the dynamic symbol table in order to get accurate backtrace.
+$(OBJDIR)backtrace$(PINTOOL_SUFFIX): $(OBJDIR)backtrace$(OBJ_SUFFIX)
+	$(LINKER) $(EXPORT_ALL) $(COMP_EXE)$@ $< $(filter-out $(VERSION_SCRIPT_PATTERN),$(TOOL_LDFLAGS_NOOPT)) $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)backtrace_from_dll$(PINTOOL_SUFFIX): $(OBJDIR)backtrace_from_dll$(OBJ_SUFFIX) $(OBJDIR)$(DLL_PREFIX)backtrace_dll$(DLL_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS_NOOPT) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)pin_backtrace_on_assert$(PINTOOL_SUFFIX): $(OBJDIR)pin_backtrace_on_assert$(OBJ_SUFFIX) $(CONTROLLERLIB)
+	$(LINKER) $(EXPORT_ALL) $(COMP_EXE)$@ $< $(filter-out $(VERSION_SCRIPT_PATTERN),$(TOOL_LDFLAGS_NOOPT)) $(TOOL_LPATHS) $(TOOL_LIBS)
+
+###### Special objects' build rules ######
+
+ifeq ($(OS_TYPE),win)
+    OMIT_SOURCE_LOCATION := /DOMIT_SOURCE_LOCATION
+else
+    OMIT_SOURCE_LOCATION := -DOMIT_SOURCE_LOCATION
+endif
+
+$(OBJDIR)backtrace$(OBJ_SUFFIX): backtrace.cpp
+	$(CXX) $(TOOL_CXXFLAGS_NOOPT) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)omit_source_location$(OBJ_SUFFIX): omit_source_location.cpp
+	$(CXX) $(OMIT_SOURCE_LOCATION) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)app_backtrace_app$(EXE_SUFFIX): app_backtrace_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) \
+	  $(CXX_LPATHS) $(CXX_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)backtrace_from_dll$(OBJ_SUFFIX): backtrace_from_dll.cpp
+	$(CXX) $(TOOL_CXXFLAGS_NOOPT) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)backtrace_dll$(OBJ_SUFFIX): backtrace_dll.cpp
+	$(CXX) $(TOOL_CXXFLAGS_NOOPT) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)pin_backtrace_on_assert$(OBJ_SUFFIX): pin_backtrace_on_assert.cpp
+	$(CXX) $(TOOL_CXXFLAGS_NOOPT) $(COMP_OBJ)$@ $<
+
+###### Special dlls' build rules ######
+
+$(OBJDIR)$(DLL_PREFIX)backtrace_dll$(DLL_SUFFIX): $(OBJDIR)backtrace_dll$(OBJ_SUFFIX)
+	$(LINKER) $(EXPORT_ALL) $(filter-out $(VERSION_SCRIPT_PATTERN),$(TOOL_LDFLAGS_NOOPT)) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(filter-out -lpin$(LIBPIN_SUFFIX),$(TOOL_LIBS))

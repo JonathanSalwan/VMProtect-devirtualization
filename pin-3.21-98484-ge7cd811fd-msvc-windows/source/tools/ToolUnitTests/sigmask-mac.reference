@@ -1,0 +1,23 @@
+Before signal1
+--------------
+usr1 blocked
+
+In handler
+--------------
+usr1 blocked
+term blocked
+winch blocked
+
+After signal1
+--------------
+usr1 blocked
+
+In handler
+--------------
+usr1 blocked
+term blocked
+
+After signal2
+--------------
+usr1 blocked
+

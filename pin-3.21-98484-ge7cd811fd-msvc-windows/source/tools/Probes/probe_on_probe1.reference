@@ -1,0 +1,10 @@
+Inserted probe for do_nothing
+Inserted probe for nothing_doing
+Notify 2 before
+Notify 1 before
+Notify 1 after.
+Notify 2 after.
+NotifySig 2 before
+NotifySig 1 before
+NotifySig 1 after.
+NotifySig 2 after.

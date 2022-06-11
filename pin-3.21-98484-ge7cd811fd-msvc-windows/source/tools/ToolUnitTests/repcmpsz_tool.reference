@@ -1,0 +1,54 @@
+Read size : 1 %ecx 9 [TRUE]
+Predicated Read size : 1 %ecx 9 [TRUE]
+FirstREPped instruction had correct first iteration flag
+After Count : 8
+Predicated After Count : 8
+Read size : 1 %ecx 8 [TRUE]
+Predicated Read size : 1 %ecx 8 [TRUE]
+After Count : 7
+Predicated After Count : 7
+Read size : 1 %ecx 9 [TRUE]
+Predicated Read size : 1 %ecx 9 [TRUE]
+After Count : 8
+Predicated After Count : 8
+Read size : 1 %ecx 8 [TRUE]
+Predicated Read size : 1 %ecx 8 [TRUE]
+After Count : 7
+Predicated After Count : 7
+Read size : 1 %ecx 7 [TRUE]
+Predicated Read size : 1 %ecx 7 [TRUE]
+After Count : 6
+Predicated After Count : 6
+Read size : 1 %ecx 6 [TRUE]
+Predicated Read size : 1 %ecx 6 [TRUE]
+After Count : 5
+Predicated After Count : 5
+Read size : 1 %ecx 5 [TRUE]
+Predicated Read size : 1 %ecx 5 [TRUE]
+After Count : 4
+Predicated After Count : 4
+Read size : 1 %ecx 4 [TRUE]
+Predicated Read size : 1 %ecx 4 [TRUE]
+After Count : 3
+Predicated After Count : 3
+Read size : 1 %ecx 3 [TRUE]
+Predicated Read size : 1 %ecx 3 [TRUE]
+After Count : 2
+Predicated After Count : 2
+Read size : 1 %ecx 2 [TRUE]
+Predicated Read size : 1 %ecx 2 [TRUE]
+After Count : 1
+Predicated After Count : 1
+Read size : 1 %ecx 1 [TRUE]
+Predicated Read size : 1 %ecx 1 [TRUE]
+After Count : 0
+Predicated After Count : 0
+Read size : 1 %ecx 0 [FALSE]
+After Count : 0
+Read size : 2 %ecx 0 [TRUE]
+Predicated Read size : 2 %ecx 0 [TRUE]
+After Count : 0
+Predicated After Count : 0
+REP starts     2
+REP iterations 11
+REP zeros      1

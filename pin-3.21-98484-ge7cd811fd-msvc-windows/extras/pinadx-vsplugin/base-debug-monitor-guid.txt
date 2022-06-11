@@ -1,0 +1,6 @@
+#
+# Copyright (C) 2012-2012 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+{E8123465-F829-4326-8E73-A212AFD679DC}

@@ -1,0 +1,7 @@
+qux\+0x[0-9a-f]+ at \S*app_backtrace_app.exe\+0x[0-9a-f]+
+bar\+0x[0-9a-f]+ at \S*app_backtrace_app.exe\+0x[0-9a-f]+
+foo\+0x[0-9a-f]+ at \S*app_backtrace_app.exe\+0x[0-9a-f]+
+main\+0x[0-9a-f]+ at \S*app_backtrace_app.exe\+0x[0-9a-f]+
+qux\+0x[0-9a-f]+ at \S*app_backtrace_app.exe\+0x[0-9a-f]+
+foo\+0x[0-9a-f]+ at \S*app_backtrace_app.exe\+0x[0-9a-f]+
+main\+0x[0-9a-f]+ at \S*app_backtrace_app.exe\+0x[0-9a-f]+

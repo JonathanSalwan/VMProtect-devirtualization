@@ -1,0 +1,8 @@
+Total : 38 Executed : 37
+lodsd :  2 2
+movsb :  4 4
+movsw :  4 4
+movsd :  4 4
+scasw :  8 8
+cmpsb :  10 9
+stosw :  6 6

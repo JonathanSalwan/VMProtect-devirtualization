@@ -1,0 +1,157 @@
+#
+# Copyright (C) 2012-2021 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS :=
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS :=
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS :=
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS += plt_syms unmap_relro
+    APP_ROOTS += plt_syms_app unmap_relro_app
+    ifeq ($(TARGET),intel64)
+        APP_ROOTS += vsyscall_area_app
+        TOOL_ROOTS += vsyscall_area_tool
+        TEST_TOOL_ROOTS += check_low_high_image
+        TEST_ROOTS += linux32_personality vsyscall_area
+    endif
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+# see mantis 4822
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(DIST_NAME_UBUNTU),1)
+        DIST_VER_GE_1910 := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion ge 19.10)
+        ifeq ($(DIST_VER_GE_1910),1)
+            TEST_TOOL_ROOTS := $(filter-out plt_syms, $(TEST_TOOL_ROOTS))
+            APP_ROOTS := $(filter-out plt_syms_app, $(APP_ROOTS))
+        endif
+    endif
+endif
+
+# See mantis 4878 (CET machine)
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(TARGET),intel64)
+        HOSTNAME_MATCH := $(shell $(TOOLS_ROOT)/Utils/testHostName has bitl64-tgl-249)
+        ifeq ($(HOSTNAME_MATCH), 1)
+            APP_ROOTS := $(filter-out vsyscall_area_app, $(APP_ROOTS))
+            TOOL_ROOTS := $(filter-out vsyscall_area_tool, $(TOOL_ROOTS))
+            TEST_ROOTS := $(filter-out vsyscall_area, $(TEST_ROOTS))
+        endif
+    endif
+endif
+
+# In case kernel version >= 5.3 we have 4 prints in vsyscall_area.test => 2 from the tool (callbacks) and 2 from the application.
+# Otherwise, vsyscall area is fetched and instrumented as usual => only 2 prints from the application
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(TARGET),intel64)
+        KERNEL_VER_GE_530 := $(shell $(TOOLS_ROOT)/Utils/testLinuxKernelVersion ge 5.3.0)
+        ifeq ($(KERNEL_VER_GE_530),1)
+            NUMBER_OF_VSYSCALL_PRINTS = 4
+        else
+            NUMBER_OF_VSYSCALL_PRINTS = 2
+        endif
+    endif
+endif
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+linux32_personality.test: $(TESTAPP)
+	$(SETARCH) linux32 $(PIN) -- $(TESTAPP) makefile $(OBJDIR)makefile.linux32_personality.copy
+	$(RM) $(OBJDIR)makefile.linux32_personality.copy
+
+plt_syms.test: $(OBJDIR)plt_syms_app$(EXE_SUFFIX) $(OBJDIR)plt_syms$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)plt_syms$(PINTOOL_SUFFIX) -- $(OBJDIR)plt_syms_app$(EXE_SUFFIX) > $(OBJDIR)plt_syms.out 2>&1
+	$(QGREP) "Inserted probe call before write@plt" $(OBJDIR)plt_syms.out
+	$(QGREP) "calling write@plt" $(OBJDIR)plt_syms.out
+	$(RM) $(OBJDIR)plt_syms.out
+	
+unmap_relro.test: $(OBJDIR)unmap_relro$(PINTOOL_SUFFIX) $(OBJDIR)unmap_relro_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)unmap_relro$(PINTOOL_SUFFIX) -- $(OBJDIR)unmap_relro_app$(EXE_SUFFIX) > $(OBJDIR)unmap_relro.out 2>&1
+	$(QGREP) 'Moving \[' $(OBJDIR)unmap_relro.out
+	$(QGREP) "Test passed successfully" $(OBJDIR)unmap_relro.out
+	$(RM) $(OBJDIR)unmap_relro.out
+
+check_low_high_image.test: $(OBJDIR)check_low_high_image$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $< -- $(TESTAPP) makefile $(OBJDIR)makefile.check_low_high_image.copy > $(OBJDIR)check_low_high_image.out 2>&1
+	$(BASHTEST) `$(CGREP) "ERROR" $(OBJDIR)check_low_high_image.out` -eq "0"
+	$(RM) $(OBJDIR)check_low_high_image.out $(OBJDIR)makefile.check_low_high_image.copy
+
+# Application branch into vsyscall area (using call instruction). Checks that if Pin runs that branch natively (kernel >= 5.3)
+# then that vsyscall area is not being instrumented. 
+vsyscall_area.test: $(OBJDIR)vsyscall_area_tool$(PINTOOL_SUFFIX) $(OBJDIR)vsyscall_area_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)vsyscall_area_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)vsyscall_area_tool.log \
+	    -- $(OBJDIR)vsyscall_area_app$(EXE_SUFFIX) > $(OBJDIR)vsyscall_area.out
+	$(CGREP) "vsyscall return value : 0" $(OBJDIR)vsyscall_area.out | $(QGREP) $(NUMBER_OF_VSYSCALL_PRINTS)
+	$(RM) $(OBJDIR)vsyscall_area_tool.log $(OBJDIR)vsyscall_area.out
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+$(OBJDIR)unmap_relro_app$(EXE_SUFFIX): unmap_relro_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) -Wl,-z,relro $(APP_LIBS)

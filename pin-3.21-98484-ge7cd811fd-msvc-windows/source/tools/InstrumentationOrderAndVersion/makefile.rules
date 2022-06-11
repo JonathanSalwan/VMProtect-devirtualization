@@ -1,0 +1,326 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := instrumentation_order1 instrumentation_order2 instrumentation_order3 instrumentation_order4 \
+                   instrumentation_order5 instrumentation_order6 instrumentation_order7 instrumentation_order8 \
+                   instrumentation_order9 instrumentation_order10 instrumentation_order11 instrumentation_order12 \
+                   instrumentation_order13 instrumentation_order14 instrumentation_order15 instrumentation_order16 \
+                   instrumentation_order17 instrumentation_order18 instrumentation_order19 instrumentation_order20 \
+                   instrumentation_order21 instrumentation_order22 instrumentation_order23 instrumentation_order \
+                   callbacks_order
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS :=
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := special_case_app instrumentation_order_app
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS += special special_case special_case1 special_case2 special_case3 special_case_aoti special_case_aoti1
+    APP_ROOTS += redblue
+endif
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    TEST_TOOL_ROOTS += special special_case special_case1 special_case2 special_case3 special_case_aoti special_case_aoti1
+    APP_ROOTS += redblue
+    OBJECT_ROOTS += redblue_$(TARGET)
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+special.test: $(OBJDIR)special$(PINTOOL_SUFFIX) $(OBJDIR)redblue$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)special$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) -- $(OBJDIR)redblue$(EXE_SUFFIX)
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) special.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out)
+
+special_case.test: $(OBJDIR)special_case$(PINTOOL_SUFFIX) $(OBJDIR)special_case_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)special_case$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) -- $(OBJDIR)special_case_app$(EXE_SUFFIX)
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) special_case.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out)
+
+special_case1.test: $(OBJDIR)special_case1$(PINTOOL_SUFFIX) $(OBJDIR)special_case_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)special_case1$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)special_case_app$(EXE_SUFFIX)
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) special_case1.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out)
+
+special_case2.test: $(OBJDIR)special_case2$(PINTOOL_SUFFIX) $(OBJDIR)special_case_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)special_case2$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)special_case_app$(EXE_SUFFIX)
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) special_case.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out)
+
+special_case3.test: $(OBJDIR)special_case3$(PINTOOL_SUFFIX) $(OBJDIR)special_case_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)special_case3$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)special_case_app$(EXE_SUFFIX)
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) special_case1.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out)
+
+special_case_aoti.test: $(OBJDIR)special_case_aoti$(PINTOOL_SUFFIX) $(OBJDIR)special_case_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)special_case_aoti$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)special_case_app$(EXE_SUFFIX)
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) special_case_aoti.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out)
+
+special_case_aoti1.test: $(OBJDIR)special_case_aoti1$(PINTOOL_SUFFIX) $(OBJDIR)special_case_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)special_case_aoti1$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)special_case_app$(EXE_SUFFIX)
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) special_case_aoti1.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out)
+
+instrumentation_order.test: $(OBJDIR)instrumentation_order$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order_tool.out
+
+instrumentation_order1.test: $(OBJDIR)instrumentation_order1$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order1$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order1_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order1.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order1_tool.out
+
+instrumentation_order2.test: $(OBJDIR)instrumentation_order2$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order2$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order2_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order2.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order2_tool.out
+
+instrumentation_order3.test: $(OBJDIR)instrumentation_order3$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order3$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order3_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order3.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order3_tool.out
+
+instrumentation_order4.test: $(OBJDIR)instrumentation_order4$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order4$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order4_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order4.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order4_tool.out
+
+instrumentation_order5.test: $(OBJDIR)instrumentation_order5$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order5$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order5_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order5.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order5_tool.out
+
+instrumentation_order6.test: $(OBJDIR)instrumentation_order6$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order6$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order6_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order6.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order6_tool.out
+
+instrumentation_order7.test: $(OBJDIR)instrumentation_order7$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order7$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order7_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order7.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order7_tool.out
+
+instrumentation_order8.test: $(OBJDIR)instrumentation_order8$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order8$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order8_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order8.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order8_tool.out
+
+instrumentation_order9.test: $(OBJDIR)instrumentation_order9$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order9$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order9_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order9.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order9_tool.out
+
+instrumentation_order10.test: $(OBJDIR)instrumentation_order10$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order10$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order10_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order10.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order10_tool.out
+
+instrumentation_order11.test: $(OBJDIR)instrumentation_order11$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order11$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order11_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order11.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order11_tool.out
+
+instrumentation_order12.test: $(OBJDIR)instrumentation_order12$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order12$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order12_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order12.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order12_tool.out
+
+instrumentation_order13.test: $(OBJDIR)instrumentation_order13$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order13$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order13_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order13.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order13_tool.out
+
+instrumentation_order14.test: $(OBJDIR)instrumentation_order14$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)instrumentation_order14$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order14_tool.out
+	echo "instrumentation_order14.test pin execution should fail.  Ignore the error (above, but not one below!)."
+	$(QGREP) "RTN_InsertCall is NOT supported from the tool's TRACE or INS instrumentation callback" \
+	  $(OBJDIR)instrumentation_order14_tool.out
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order14_tool.out
+
+instrumentation_order15.test: $(OBJDIR)instrumentation_order15$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)instrumentation_order15$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order15_tool.out
+	echo "instrumentation_order15.test pin execution should fail.  Ignore the error (above, but not one below!)."
+	$(QGREP) "RTN_InsertCall is NOT supported from the tool's TRACE or INS instrumentation callback" \
+	  $(OBJDIR)instrumentation_order15_tool.out
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order15_tool.out
+
+instrumentation_order16.test: $(OBJDIR)instrumentation_order16$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order16$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order16_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order16.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order16_tool.out
+
+instrumentation_order17.test: $(OBJDIR)instrumentation_order17$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order17$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order17_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order17.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order17_tool.out
+
+instrumentation_order18.test: $(OBJDIR)instrumentation_order18$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order18$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order18_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order18.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order18_tool.out
+
+instrumentation_order19.test: $(OBJDIR)instrumentation_order19$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)instrumentation_order19$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order19_tool.out
+	$(DIFF) $(@:%.test=$(OBJDIR)%.out) instrumentation_order19.ref
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order19_tool.out
+
+instrumentation_order20.test: $(OBJDIR)instrumentation_order20$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)instrumentation_order20$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order20_tool.out
+	echo "instrumentation_order20.test pin execution should fail.  Ignore the error (above, but not one below!)."
+	$(QGREP) "RTN_ReplaceSignature is NOT supported from the tool's TRACE or INS instrumentation callback" \
+	  $(OBJDIR)instrumentation_order20_tool.out
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order20_tool.out
+
+instrumentation_order21.test: $(OBJDIR)instrumentation_order21$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)instrumentation_order21$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order21_tool.out
+	echo "instrumentation_order21.test pin execution should fail.  Ignore the error (above, but not one below!)."
+	$(QGREP) "RTN_ReplaceSignature is NOT supported from the tool's TRACE or INS instrumentation callback" \
+	  $(OBJDIR)instrumentation_order21_tool.out
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order21_tool.out
+
+instrumentation_order22.test: $(OBJDIR)instrumentation_order22$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)instrumentation_order22$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order22_tool.out
+	echo "instrumentation_order22.test pin execution should fail.  Ignore the error (above, but not one below!)."
+	$(QGREP) "RTN_Replace is NOT supported from the tool's TRACE or INS instrumentation callback" \
+	  $(OBJDIR)instrumentation_order22_tool.out
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order22_tool.out
+
+instrumentation_order23.test: $(OBJDIR)instrumentation_order23$(PINTOOL_SUFFIX) $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)instrumentation_order23$(PINTOOL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) \
+	  -- $(OBJDIR)instrumentation_order_app$(EXE_SUFFIX) > $(OBJDIR)instrumentation_order23_tool.out
+	echo "instrumentation_order23.test pin execution should fail.  Ignore the error (above, but not one below!)."
+	$(QGREP) "RTN_Replace is NOT supported from the tool's TRACE or INS instrumentation callback" \
+	  $(OBJDIR)instrumentation_order23_tool.out
+	$(RM) $(@:%.test=$(OBJDIR)%.out) $(OBJDIR)instrumentation_order23_tool.out
+
+callbacks_order.test: $(OBJDIR)callbacks_order$(PINTOOL_SUFFIX) $(TESTAPP)
+	-$(PIN) -t $(OBJDIR)callbacks_order$(PINTOOL_SUFFIX) -o $(OBJDIR)callbacks_order.out \
+	  -- $(TESTAPP) makefile.rules $(OBJDIR)makefile.rules.callbacks_order 
+	$(DIFF) callbacks_order.reference $(OBJDIR)callbacks_order.out
+	$(RM) $(OBJDIR)makefile.rules.callbacks_order $(OBJDIR)callbacks_order.out
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special applications' build rules ######
+
+$(OBJDIR)instrumentation_order_app$(EXE_SUFFIX): instrumentation_order_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)special_case_app$(EXE_SUFFIX): special_case_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(NO_PIC) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+ifeq ($(TARGET_OS),linux)
+$(OBJDIR)redblue$(EXE_SUFFIX): redblue$(ASM_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS)
+endif
+
+ifeq ($(TARGET_OS),windows)
+$(OBJDIR)redblue$(EXE_SUFFIX): $(OBJDIR)redblue_$(TARGET)$(OBJ_SUFFIX) redblue.cpp
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) /EXPORT:red /EXPORT:blue /EXPORT:common $(APP_LIBS)
+endif

@@ -1,0 +1,183 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := 
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS := checkflags
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS := checkflags_tool
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := checkflags_app
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS := checkflags_asm
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+#Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS += ifunc_complex_resolver
+    TOOL_ROOTS += ifuncInstrumentation
+    TEST_ROOTS += ifuncInstrumentationStrcmp ifuncInstrumentationGettimeofday
+    APP_ROOTS += ifuncInstrumentationApp ifunc_complex_resolver_app
+    DLL_ROOTS += ifunc_complex_resolver_lib_app
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    ifneq ($(shell ./is_ifunc_supported.py $(APP_CC) $(TARGET)),IFUNC_SUPPORTED)
+        TEST_TOOL_ROOTS := $(filter-out ifunc_complex_resolver, $(TEST_TOOL_ROOTS))
+        TOOL_ROOTS := $(filter-out ifuncInstrumentation, $(TOOL_ROOTS))
+        TEST_ROOTS := $(filter-out ifuncInstrumentationStrcmp ifuncInstrumentationGettimeofday, $(TEST_ROOTS))
+        APP_ROOTS := $(filter-out ifuncInstrumentationApp ifunc_complex_resolver_app, $(APP_ROOTS))
+        DLL_ROOTS := $(filter-out ifunc_complex_resolver_lib_app, $(DLL_ROOTS))
+    endif
+endif
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+# See mantis 4439
+# Disabled for libc 2.26
+ifeq ($(TARGET_OS),linux)
+    LIBC_VERSION_GE_2_26 := $(shell $(TOOLS_ROOT)/Utils/testLibcVersion ge 2.26)
+    ifeq ($(LIBC_VERSION_GE_2_26),1)
+        TEST_ROOTS := $(filter-out ifuncInstrumentationStrcmp, $(TEST_ROOTS))
+    endif
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+ifuncInstrumentationStrcmp.test: $(OBJDIR)ifuncInstrumentation$(PINTOOL_SUFFIX) $(OBJDIR)ifuncInstrumentationApp$(EXE_SUFFIX)
+	failed=0; \
+	NATIVE_LIBC_FULLPATH=`ldd $(OBJDIR)ifuncInstrumentationApp$(EXE_SUFFIX) | grep libc.so | grep -v "not found" | cut -f 3 -d' '`; \
+    STRCMP_SYMBOL_TYPE=`objdump -T $$NATIVE_LIBC_FULLPATH | grep " strcmp" | head -n 1 | awk '{print $$3}'`; \
+	if [ "iD" = "$$STRCMP_SYMBOL_TYPE" ]; then \
+	  $(PIN) -t $(OBJDIR)ifuncInstrumentation$(PINTOOL_SUFFIX) -function_name strcmp \
+	    -- $(OBJDIR)ifuncInstrumentationApp$(EXE_SUFFIX) > $(OBJDIR)ifuncInstrumentation_strcmp.log; \
+	  if ! $(GREP) "New implementation!" $(OBJDIR)ifuncInstrumentation_strcmp.log | wc -l | $(QGREP) 1; then failed=1; fi;\
+	  if ! $(GREP) "Hello once (resolver)" $(OBJDIR)ifuncInstrumentation_strcmp.log | wc -l | $(QGREP) 1; then failed=1; fi; \
+        fi;  \
+	$(BASHTEST) $$failed -eq 0
+	$(RM) -f $(OBJDIR)ifuncInstrumentation_strcmp*
+
+ifuncInstrumentationGettimeofday.test: $(OBJDIR)ifuncInstrumentation$(PINTOOL_SUFFIX) $(OBJDIR)ifuncInstrumentationApp$(EXE_SUFFIX) 
+	failed=0; \
+	NATIVE_LIBC_FULLPATH=`ldd $(OBJDIR)ifuncInstrumentationApp$(EXE_SUFFIX) | grep libc.so | grep -v "not found" | cut -f 3 -d' '`; \
+    GETTIMEOFDAY_SYMBOL_TYPE=`objdump -T $$NATIVE_LIBC_FULLPATH | grep " gettimeofday" | head -n 1 | awk '{print $$3}'`; \
+	if [ "iD" = "$$GETTIMEOFDAY_SYMBOL_TYPE" ]; then \
+	  $(PIN) -t $(OBJDIR)ifuncInstrumentation$(PINTOOL_SUFFIX) -function_name gettimeofday \
+	    -- $(OBJDIR)ifuncInstrumentationApp$(EXE_SUFFIX) > $(OBJDIR)ifuncInstrumentation_gettimeofday.log; \
+	  if ! $(GREP) "New implementation!" $(OBJDIR)ifuncInstrumentation_gettimeofday.log | wc -l | $(QGREP) 3; then failed=1; fi;\
+	  if ! $(GREP) "Hello once (resolver)" $(OBJDIR)ifuncInstrumentation_gettimeofday.log | wc -l | $(QGREP) 1; then failed=1; fi; \
+	fi; \
+	$(BASHTEST) $$failed -eq 0
+	$(RM) -f $(OBJDIR)ifuncInstrumentation_gettimeofday*
+
+checkflags.test: $(OBJDIR)checkflags_tool$(PINTOOL_SUFFIX) $(OBJDIR)checkflags_app$(EXE_SUFFIX)
+	$(PIN) -t $< -- $(OBJDIR)checkflags_app$(EXE_SUFFIX) > $(OBJDIR)checkflags.out
+	$(QGREP) "In PushfAnalysis" $(OBJDIR)checkflags.out
+	$(RM) $(OBJDIR)checkflags.out
+
+ifunc_complex_resolver.test: $(OBJDIR)ifunc_complex_resolver$(PINTOOL_SUFFIX) $(OBJDIR)ifunc_complex_resolver_lib_app$(DLL_SUFFIX) $(OBJDIR)ifunc_complex_resolver_app$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)ifunc_complex_resolver.file $(OBJDIR)ifunc_complex_resolver.out
+	$(PIN) -t $(OBJDIR)ifunc_complex_resolver$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)ifunc_complex_resolver_app$(EXE_SUFFIX) > $(OBJDIR)ifunc_complex_resolver.out 2>&1
+	$(QGREP) "Before_ifunc_not_exist" $(OBJDIR)ifunc_complex_resolver.out
+	$(TOUCH) $(OBJDIR)ifunc_complex_resolver.file
+	$(PIN) -t $(OBJDIR)ifunc_complex_resolver$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)ifunc_complex_resolver_app$(EXE_SUFFIX) > $(OBJDIR)ifunc_complex_resolver.out 2>&1
+	$(QGREP) "Before_ifunc_exist" $(OBJDIR)ifunc_complex_resolver.out
+	$(RM) -f $(OBJDIR)ifunc_complex_resolver.file $(OBJDIR)ifunc_complex_resolver.out
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+ifeq ($(TARGET_OS),windows)
+    CHECKFLAGS_APP_EXPORTS := /EXPORT:CheckFlags
+endif
+
+###### Special applications' build rules ######
+
+$(OBJDIR)ifuncInstrumentationApp$(EXE_SUFFIX): ifuncInstrumentationApp.c 
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)checkflags_app$(EXE_SUFFIX): checkflags_app.c $(OBJDIR)checkflags_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(CHECKFLAGS_APP_EXPORTS) $(APP_LIBS)
+
+$(OBJDIR)ifunc_complex_resolver_app$(EXE_SUFFIX): ifunc_complex_resolver_app.c $(OBJDIR)$(DLL_PREFIX)ifunc_complex_resolver_lib_app$(DLL_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(OBJDIR)$(DLL_PREFIX)ifunc_complex_resolver_lib_app$(DLL_SUFFIX)
+
+###### Special objects' build rules ######
+
+$(OBJDIR)ifunc_complex_resolver_lib_app$(OBJ_SUFFIX): ifunc_complex_resolver_lib_app.c
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+###### Special dlls' build rules ######
+
+$(OBJDIR)$(DLL_PREFIX)ifunc_complex_resolver_lib_app$(DLL_SUFFIX): $(OBJDIR)ifunc_complex_resolver_lib_app$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)

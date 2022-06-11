@@ -1,0 +1,12 @@
+#! /bin/bash
+
+script_dir=`dirname $0`
+dist_name=`$script_dir/printLinuxDistName`
+
+case $dist_name in
+    *sles* )        echo `$script_dir/testLinuxDistVersion ge 12`;;
+    *opensuse* )    echo `$script_dir/testLinuxDistVersion ge 13`;;
+    *suse* )        echo `$script_dir/testLinuxDistVersion ge 13`;;
+    * ) echo 0;;
+esac
+

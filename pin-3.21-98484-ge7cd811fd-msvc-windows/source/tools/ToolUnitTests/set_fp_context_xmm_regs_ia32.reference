@@ -1,0 +1,50 @@
+TOOL found and replaced ReplacedXmmRegs
+TOOL found ExecutedAtFunc for later PIN_ExecuteAt
+TOOL found DumpXmmRegsAtException for later Exception
+xmm regs at ReplacedXmmRegs
+TOOL in REPLACE_ReplacedXmmRegs
+TOOL Calling replaced ReplacedXmmRegs()
+DumpXmmRegs
+xmm0: acdcacdc:acdcacdc:acdcacdc:acdcacdc:
+xmm1: acdcacdc:acdcacdc:acdcacdc:acdcacdc:
+xmm2: acdcacdc:acdcacdc:acdcacdc:acdcacdc:
+xmm3: acdcacdc:acdcacdc:acdcacdc:acdcacdc:
+xmm4: acdcacdc:acdcacdc:acdcacdc:acdcacdc:
+xmm5: acdcacdc:acdcacdc:acdcacdc:acdcacdc:
+xmm6: acdcacdc:acdcacdc:acdcacdc:acdcacdc:
+xmm7: acdcacdc:acdcacdc:acdcacdc:acdcacdc:
+TOOL Returned from replaced ReplacedXmmRegs()
+TOOL Calling ExecutedAtFunc
+DumpXmmRegs
+xmm0: deadbeef:deadbeef:deadbeef:deadbeef:
+xmm1: deadbeef:deadbeef:deadbeef:deadbeef:
+xmm2: deadbeef:deadbeef:deadbeef:deadbeef:
+xmm3: deadbeef:deadbeef:deadbeef:deadbeef:
+xmm4: deadbeef:deadbeef:deadbeef:deadbeef:
+xmm5: deadbeef:deadbeef:deadbeef:deadbeef:
+xmm6: deadbeef:deadbeef:deadbeef:deadbeef:
+xmm7: deadbeef:deadbeef:deadbeef:deadbeef:
+xmm regs before exception
+DumpXmmRegs
+xmm0: a5a5a5a5:a5a5a5a5:a5a5a5a5:a5a5a5a5:
+xmm1: a5a5a5a5:a5a5a5a5:a5a5a5a5:a5a5a5a5:
+xmm2: a5a5a5a5:a5a5a5a5:a5a5a5a5:a5a5a5a5:
+xmm3: a5a5a5a5:a5a5a5a5:a5a5a5a5:a5a5a5a5:
+xmm4: a5a5a5a5:a5a5a5a5:a5a5a5a5:a5a5a5a5:
+xmm5: a5a5a5a5:a5a5a5a5:a5a5a5a5:a5a5a5a5:
+xmm6: a5a5a5a5:a5a5a5a5:a5a5a5a5:a5a5a5a5:
+xmm7: a5a5a5a5:a5a5a5a5:a5a5a5a5:a5a5a5a5:
+TOOL OnException callback
+TOOL CheckAndSetFpContextXmmRegs
+TOOL Checked ctxtFrom OK
+TOOL Checked ctxtTo OK
+next print of xmm regs will be after the tool's OnException function has set their values
+DumpXmmRegs
+xmm0: 5a5a5a5a:5a5a5a5a:5a5a5a5a:5a5a5a5a:
+xmm1: 5a5a5a5a:5a5a5a5a:5a5a5a5a:5a5a5a5a:
+xmm2: 5a5a5a5a:5a5a5a5a:5a5a5a5a:5a5a5a5a:
+xmm3: 5a5a5a5a:5a5a5a5a:5a5a5a5a:5a5a5a5a:
+xmm4: 5a5a5a5a:5a5a5a5a:5a5a5a5a:5a5a5a5a:
+xmm5: 5a5a5a5a:5a5a5a5a:5a5a5a5a:5a5a5a5a:
+xmm6: 5a5a5a5a:5a5a5a5a:5a5a5a5a:5a5a5a5a:
+xmm7: 5a5a5a5a:5a5a5a5a:5a5a5a5a:5a5a5a5a:

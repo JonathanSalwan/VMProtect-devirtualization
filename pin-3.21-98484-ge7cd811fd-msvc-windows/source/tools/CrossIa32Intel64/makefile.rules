@@ -1,0 +1,610 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+###### Special configuration ######
+
+# This file is different than all the rest of the makefiles because it tests
+# cross architecture explicitly. So we need to define some useful variables.
+
+XOBJDIR := obj-ia32/
+XTARGET := ia32
+
+ifeq ($(TARGET_OS),windows)
+    ifeq ($(ICC),1)
+        MAKE_PREFIX_ia32 := cmd /c compiler-env.bat icl_x86
+        MAKE_PREFIX_intel64 := cmd /c compiler-env.bat icl_amd64
+    else
+        MAKE_PREFIX_ia32 := cmd /c compiler-env.bat x86
+        MAKE_PREFIX_intel64 := cmd /c compiler-env.bat amd64
+    endif
+endif
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS :=
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS :=
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS :=
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(TARGET),intel64)
+        TEST_TOOL_ROOTS +=
+        TEST_ROOTS += cross_32_64_32 cross_64_32_64 environment space_$(TARGET_OS) sigchld_cross child_process_injection \
+                      child_process_injection1 cross_32_64_32_probe space_probe_$(TARGET_OS)
+        TOOL_ROOTS += follow_child_tool_dummy child_process_injection_dummy
+        SA_TOOL_ROOTS +=
+        APP_ROOTS += parent_process_$(TARGET_OS)_dummy child_process_$(TARGET_OS)_dummy \
+                     grand_child_process_$(TARGET_OS)_dummy child_process_injection_app_dummy sigchld_app_dummy \
+                     child_process_injection_app1_dummy
+        OBJECT_ROOTS +=
+        DLL_ROOTS +=
+        LIB_ROOTS +=
+    endif
+endif
+
+# macOS*
+# Starting from macOS 10.14 clang doesn't support building 32 bits. 
+# Starting from macOS 10.15 32 bit binaries won't be able to run.
+# Starting from clang 11 we build Pin only in 64 bit (since clang 11 don't support 32 bit), therefore it can't run 32 bit 
+# applications. (Therefore we don't run any tests here)
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    ifeq ($(TARGET),intel64)
+        TEST_TOOL_ROOTS +=
+        TEST_ROOTS += cross_32_64_32 cross_64_32_64 cross_32_64_32_probe cross_64_64_32_log cross_32_32_64_probe_log \
+                      cross_32_64_32_sym cross_64_32_64_sym cross_32_64_32_probe_sym cross_64_32_64_probe_sym \
+                      space_$(TARGET_OS) cross_64_32_early_termination cross_64_32_early_termination_probed \
+                      cross_32_64_early_termination cross_32_64_early_termination_probed \
+                      cross_64_32_early_termination_debugged cross_64_32_early_termination_probed_debugged \
+                      cross_32_64_early_termination_debugged cross_32_64_early_termination_probed_debugged \
+                      win_app32_tool_arch_mismatch win_app64_tool_arch_mismatch
+        TOOL_ROOTS += follow_child_tool_dummy follow_child_tool_sym_dummy
+        SA_TOOL_ROOTS +=
+        APP_ROOTS += parent_process_$(TARGET_OS)_dummy child_process_$(TARGET_OS)_dummy \
+                     grand_child_process_$(TARGET_OS)_dummy early_termination_dummy \
+                     win_launcher_process_dummy win_launcher_debugged_process_dummy
+        OBJECT_ROOTS +=
+        DLL_ROOTS += w_terminate_process_dll_dummy
+        LIB_ROOTS +=
+    endif
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+DONT_RUN :=
+
+# The tests are supported only in the kit environment.
+ifneq ($(KIT),1)
+    DONT_RUN := 1
+endif
+
+ifeq ($(DONT_RUN),1)
+    TEST_TOOL_ROOTS :=
+    TEST_ROOTS :=
+    TOOL_ROOTS :=
+    SA_TOOL_ROOTS :=
+    APP_ROOTS :=
+    OBJECT_ROOTS :=
+    DLL_ROOTS :=
+    LIB_ROOTS :=
+endif
+
+# Check whether child_process_injection1 can be tested on this system.
+ifeq ($(TARGET_OS),linux)
+    # See if there is a help message and chfn can be used for the test.
+    CHFN_USABLE := $(shell if ( /usr/bin/chfn --help > /dev/null 2>&1 ); then echo yes; else echo no; fi)
+    ifeq (yes,$(CHFN_USABLE))
+        # See if Pin fails to inject, otherwise chfn can't be used for the test.
+        CHFN_USABLE := $(shell if [ `$(PIN) -- /usr/bin/chfn --help > /dev/null 2>&1; echo $$?` -ne "0" ]; then echo yes; else echo no; fi)
+    endif
+    ifneq (yes,$(CHFN_USABLE))
+        TEST_ROOTS := $(filter-out child_process_injection1, $(TEST_ROOTS))
+    endif
+endif
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+# See Mantis 3197
+ifeq ($(TARGET_OS),windows)
+    TEST_ROOTS := $(filter-out cross_32_64_early_termination_debugged cross_32_64_early_termination_probed_debugged \
+                               cross_64_32_early_termination_debugged cross_64_32_early_termination_probed_debugged, \
+                               $(TEST_ROOTS))
+endif
+
+# See Mantis #4211
+ifeq ($(TARGET_OS),windows)
+    ifeq ($(TARGET),intel64)
+		ifeq ($(MSVCVER_GE_15), 1)
+            TEST_ROOTS := $(filter-out cross_32_64_32 cross_64_32_64 cross_32_64_32_probe cross_64_64_32_log cross_32_32_64_probe_log \
+                                       cross_32_64_32_sym cross_64_32_64_sym cross_32_64_32_probe_sym cross_64_32_64_probe_sym \
+                                       cross_64_32_early_termination cross_64_32_early_termination_probed \
+                                       cross_32_64_early_termination cross_32_64_early_termination_probed \
+                                       win_app32_tool_arch_mismatch win_app64_tool_arch_mismatch, $(TEST_ROOTS))
+        endif
+    endif
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+# Disable child_process_injection1 on rhel6 (or lower) - see mantis 4781
+ifeq ($(DIST_NAME_RHEL),1)
+    DIST_VER_LE_6 := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion lt 7.0)
+    ifeq ($(DIST_VER_LE_6),1)
+        SANITY_SUBSET := $(filter-out child_process_injection1, $(SANITY_SUBSET))
+    endif
+endif
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+ifeq ($(TARGET_OS),windows)
+    PINFLAGS += -cc_memory_size 0x2000000
+endif
+
+child_process_injection.test: $(OBJDIR)child_process_injection$(PINTOOL_SUFFIX) $(XOBJDIR)child_process_injection$(PINTOOL_SUFFIX) $(OBJDIR)child_process_injection_app$(EXE_SUFFIX) $(HELLO_APP)
+	$(PIN) -follow_execv 1 -t64 $(OBJDIR)child_process_injection$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)child_process_injection$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)child_process_injection_app$(EXE_SUFFIX) $(HELLO_APP) > $(OBJDIR)$(@:%.test=%).out 
+	$(QGREP) "Parent report: Child process exited successfully" $(OBJDIR)$(@:%.test=%).out
+	$(QGREP) "End of tool" $(OBJDIR)$(@:%.test=%).out
+	$(QGREP) "Hello world" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out 
+
+# The xml error file is created by a grandchild child of the original Pin process, therefore the makefile recipe will not
+# wait for it to be created. In order for the test to continue correctly, we allow a 60 second timeout for the file to be
+# created. If the error file was not created after this time, the test will fail, indicating a potential problem. If this
+# happens look for a runaway instance of $(OBJDIR)child_process_injection_app1$(EXE_SUFFIX).
+child_process_injection1.test: $(OBJDIR)child_process_injection$(PINTOOL_SUFFIX) $(XOBJDIR)child_process_injection$(PINTOOL_SUFFIX) $(OBJDIR)child_process_injection_app1$(EXE_SUFFIX)
+	$(PIN) -follow_execv 1 -error_file $(OBJDIR)$(@:%.test=%).xml -t64 $(OBJDIR)child_process_injection$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)child_process_injection$(PINTOOL_SUFFIX) -- $(OBJDIR)child_process_injection_app1$(EXE_SUFFIX) /usr/bin/chfn --help \
+	    > $(OBJDIR)$(@:%.test=%).out
+	count=0; \
+	until $(BASHTEST) -e $(OBJDIR)$(@:%.test=%).xml || $(BASHTEST) $$count -gt 60; \
+	    do sleep 1; count=`expr $$count + 1`; done
+	$(BASHTEST) -e $(OBJDIR)$(@:%.test=%).xml
+	$(QGREP) "Usage\:" $(OBJDIR)$(@:%.test=%).out
+	$(QGREP) "chfn" $(OBJDIR)$(@:%.test=%).out
+	$(QGREP) "Parent report: Child process exited successfully" $(OBJDIR)$(@:%.test=%).out
+	$(QGREP) "End of tool" $(OBJDIR)$(@:%.test=%).out
+	$(QGREP) "ERROR" $(OBJDIR)$(@:%.test=%).xml
+	$(QGREP) "/usr/bin/chfn" $(OBJDIR)$(@:%.test=%).xml
+	$(QGREP) "Pin can&apos;t be injected to the application" $(OBJDIR)$(@:%.test=%).xml
+	$(QGREP) "since it does not have read and execv access" $(OBJDIR)$(@:%.test=%).xml
+	$(QGREP) "need execute and read access to /proc" $(OBJDIR)$(@:%.test=%).xml
+	$(RM) $(OBJDIR)$(@:%.test=%).out $(OBJDIR)$(@:%.test=%).xml
+	
+# 	This test checks that if an app execvs to an application which pin cannot instrument due to permissions, while followExecv is on, it will run anyways.
+#  To do so we change the owner and permissions of an app so it is owned by root and runs setuid, pin cannot instrument it.
+# We make sure the child exits successfully and prints its message.
+# (4711 == -rws--x--x) 	
+# Note: This test is not a Cross test, but kept here for consistency with child_process_injection1.
+# Note: The roots are defined with '_dummy' as this file overrides the default build rules.
+child_process_injection1_mac.test: $(OBJDIR)child_process_injection$(PINTOOL_SUFFIX) $(OBJDIR)child_process_injection_app1$(EXE_SUFFIX)
+	$(SUDO) $(CHOWN) root $(OBJDIR)setuid_utility$(EXE_SUFFIX)
+	$(SUDO) $(CHMOD) 4711 $(OBJDIR)setuid_utility$(EXE_SUFFIX)
+	$(PIN) -follow_execv 1  -t $(OBJDIR)child_process_injection$(PINTOOL_SUFFIX) -- $(OBJDIR)child_process_injection_app1$(EXE_SUFFIX) $(OBJDIR)setuid_utility$(EXE_SUFFIX) \
+	    > $(OBJDIR)$(@:%.test=%).out
+	$(QGREP) "UtilityOK" $(OBJDIR)$(@:%.test=%).out
+	$(QGREP) "Parent report: Child process exited successfully" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_32_64_32.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	$(PIN) -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -- $(XOBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	     $(XOBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_64_32_64.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	$(PIN) -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	     $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_32_64_32_probe.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	$(PIN) -probe -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(XOBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	       $(XOBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_64_64_32_log.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	$(PIN) -xyzzy -log_server 1 -logfile $(OBJDIR)$(@:%.test=%).log -follow_execv \
+	  -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	       $(XOBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	#verify 3 files are created (for 3 servers)
+	$(BASHTEST) `$(RM) -vf $(OBJDIR)$(@:%.test=%).log* | $(LINECOUNT)` -eq "3"
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_32_32_64_probe_log.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	$(PIN) -xyzzy -log_server 1 -logfile "pin probe.log" -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(XOBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	       $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	#verify 3 files are created (for 3 servers)
+	$(SYNC)
+	$(BASHTEST) `$(RM) -vf "pin probe.log"* | $(LINECOUNT)` -eq "3"
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+sigchld_cross.test: $(XOBJDIR)sigchld_app$(EXE_SUFFIX) $(OBJDIR)sigchld_app$(EXE_SUFFIX)
+	$(PIN) -follow_execv -- $(XOBJDIR)sigchld_app$(EXE_SUFFIX) $(OBJDIR)sigchld_app$(EXE_SUFFIX)
+	$(DIFF) sigchld_app.out sigchld_app.reference
+	$(RM) sigchld_app.out
+
+cross_32_64_32_sym.test: $(OBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) $(XOBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	$(PIN) -xyzzy -log_server 1 -logfile $(OBJDIR)cross_32_64_32_sym.log -follow_execv \
+	  -t64 $(OBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) -t $(XOBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) \
+	    -- $(XOBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	       $(XOBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	#verify 3 files are created (for 3 servers)
+	$(SYNC)
+	$(BASHTEST) `$(RM) -vf $(OBJDIR)cross_32_64_32_sym.log* | $(LINECOUNT)` -eq "3"
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_64_32_64_sym.test: $(OBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	$(PIN) -xyzzy -log_server 1 -logfile $(OBJDIR)cross_64_32_64_sym.log -follow_execv \
+	  -t64 $(OBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) -t $(XOBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	       $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	#verify 3 files are created (for 3 servers)
+	$(SYNC)
+	$(BASHTEST) `$(RM) -vf $(OBJDIR)cross_64_32_64_sym.log* | $(LINECOUNT)` -eq "3"
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_32_64_32_probe_sym.test: $(OBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) $(XOBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	$(PIN) -probe -xyzzy -log_server 1 -logfile $(OBJDIR)cross_32_64_32_probe_sym.log -follow_execv \
+	  -t64 $(OBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) -t $(XOBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) \
+	    -- $(XOBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	       $(XOBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	#verify 3 files are created (for 3 servers)
+	$(SYNC)
+	$(BASHTEST) `$(RM) -vf $(OBJDIR)cross_32_64_32_probe_sym.log* | $(LINECOUNT)` -eq "3"
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_64_32_64_probe_sym.test: $(OBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	$(PIN) -probe -xyzzy -log_server 1 -logfile $(OBJDIR)cross_64_32_64_probe_sym.log -follow_execv \
+	  -t64 $(OBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) -t $(XOBJDIR)follow_child_tool_sym$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	       $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	#verify 3 files are created (for 3 servers)
+	$(SYNC)
+	$(BASHTEST) `$(RM) -vf $(OBJDIR)cross_64_32_64_probe_sym.log* | $(LINECOUNT)` -eq "3"
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+environment.test: $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	export LD_LIBRARY_PATH="APP_PATH:"$(LD_LIBRARY_PATH); $(PIN) -follow_execv -xyzzy -mesgon log_injector \
+	  -logfile $(OBJDIR)$(@:%.test=%).log \
+	  -- $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	     $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(GREP) "LD_LIBRARY_PATH for injector" $(OBJDIR)$(@:%.test=%).log | $(GREP) $(TARGET)/runtime >> $(OBJDIR)$(@:%.test=%).out
+	$(GREP) "LD_LIBRARY_PATH for pin vm" $(OBJDIR)$(@:%.test=%).log | $(GREP) $(TARGET)/runtime/pincrt >> $(OBJDIR)$(@:%.test=%).out
+	$(GREP) "LD_LIBRARY_PATH for the application" $(OBJDIR)$(@:%.test=%).log | $(GREP) APP_PATH >> $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out $(OBJDIR)$(@:%.test=%).log
+
+space_linux.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	mkdir -p "Dir with space 1"
+	$(PIN) -follow_execv -t64 "Dir with space 1"/../$(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t "Dir with space 1"/../$(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	       $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(RM) -r $(OBJDIR)$(@:%.test=%).out "Dir with space 1"
+
+space_mac.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	mkdir -p "Dir with space 1"
+	$(PIN) -follow_execv -t64 "Dir with space 1"/../$(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t "Dir with space 1"/../$(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	       $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(RM) -r $(OBJDIR)$(@:%.test=%).out "Dir with space 1"
+
+## space_probe fails if LD_LIBRARY_PATH is set incorrectly
+space_probe_linux.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX)
+	mkdir -p "Dir with space 2"
+	$(PIN) -probe -follow_execv -t64 "Dir with space 2"/../$(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t "Dir with space 2"/../$(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	       $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(RM) -r $(OBJDIR)$(@:%.test=%).out "Dir with space 2"
+
+space_windows.test:
+	mkdir -p "bin ia 32"
+	mkdir -p "bin intel 64"
+	cp -r $(dir $(PIN32))/* "bin ia 32"
+	cp -r $(dir $(PIN64))/* "bin intel 64"
+	"bin ia 32/pin.exe" -p32 "bin ia 32/pin.exe" -p64 "bin intel 64/pin.exe" -follow_execv \
+	  -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)parent_process_$(TARGET_OS)$(EXE_SUFFIX) $(XOBJDIR)child_process_$(TARGET_OS)$(EXE_SUFFIX) \
+	       $(OBJDIR)grand_child_process_$(TARGET_OS)$(EXE_SUFFIX) "param1 param2" param3 > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+	-$(RM) -rf "bin ia 32" "bin intel 64"
+
+cross_64_32_early_termination.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(OBJDIR)win_launcher_process$(EXE_SUFFIX) $(XOBJDIR)early_termination$(EXE_SUFFIX)
+	$(PIN) -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)win_launcher_process$(EXE_SUFFIX) $(XOBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 0" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+	$(PIN) -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -load_system_dlls 1 \
+	    -- $(OBJDIR)win_launcher_process $(XOBJDIR)early_termination$(EXE_SUFFIX) > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 0" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_64_32_early_termination_probed.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(OBJDIR)win_launcher_process$(EXE_SUFFIX) $(XOBJDIR)early_termination$(EXE_SUFFIX)
+	$(PIN) -probe -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)win_launcher_process$(EXE_SUFFIX) $(XOBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 1" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+	$(PIN) -probe -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -load_system_dlls 1 \
+	    -- $(OBJDIR)win_launcher_process$(EXE_SUFFIX) $(XOBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 1" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_32_64_early_termination.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)win_launcher_process$(EXE_SUFFIX) $(OBJDIR)early_termination$(EXE_SUFFIX)
+	$(PIN) -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(XOBJDIR)win_launcher_process$(EXE_SUFFIX) $(OBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 0" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+	$(PIN) -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -load_system_dlls 1 \
+	    -- $(XOBJDIR)win_launcher_process$(EXE_SUFFIX) $(OBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 0" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_32_64_early_termination_probed.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)win_launcher_process$(EXE_SUFFIX) $(OBJDIR)early_termination$(EXE_SUFFIX)
+	$(PIN) -probe -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(XOBJDIR)win_launcher_process$(EXE_SUFFIX) $(OBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 1" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(CGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+	$(PIN) -probe -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -load_system_dlls 1 \
+	    -- $(XOBJDIR)win_launcher_process$(EXE_SUFFIX) $(OBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 1" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_64_32_early_termination_debugged.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(OBJDIR)win_launcher_debugged_process$(EXE_SUFFIX) $(XOBJDIR)early_termination$(EXE_SUFFIX)
+	$(PIN) -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)win_launcher_debugged_process$(EXE_SUFFIX) $(XOBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 0" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+	$(PIN) -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -load_system_dlls 1 \
+	    -- $(OBJDIR)win_launcher_debugged_process$(EXE_SUFFIX) $(XOBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 0" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_64_32_early_termination_probed_debugged.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(OBJDIR)win_launcher_debugged_process$(EXE_SUFFIX) $(XOBJDIR)early_termination$(EXE_SUFFIX)
+	$(PIN) -probe -follow_execv \
+	  -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)win_launcher_debugged_process$(EXE_SUFFIX) $(XOBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 1" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+	$(PIN) -probe -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -load_system_dlls 1 \
+	    -- $(OBJDIR)win_launcher_debugged_process$(EXE_SUFFIX) $(XOBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 1" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_32_64_early_termination_debugged.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)win_launcher_debugged_process$(EXE_SUFFIX) $(OBJDIR)early_termination$(EXE_SUFFIX)
+	$(PIN) -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(XOBJDIR)win_launcher_debugged_process$(EXE_SUFFIX) $(OBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 0" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+	$(PIN) -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -load_system_dlls 1 \
+	    -- $(XOBJDIR)win_launcher_debugged_process$(EXE_SUFFIX) $(OBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 0" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+cross_32_64_early_termination_probed_debugged.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)win_launcher_debugged_process$(EXE_SUFFIX) $(OBJDIR)early_termination$(EXE_SUFFIX)
+	$(PIN) -probe -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	    -- $(XOBJDIR)win_launcher_debugged_process$(EXE_SUFFIX) $(OBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 1" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+	$(PIN) -probe -follow_execv -t64 $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) -load_system_dlls 1 \
+	    -- $(XOBJDIR)win_launcher_debugged_process$(EXE_SUFFIX) $(OBJDIR)early_termination$(EXE_SUFFIX) \
+	      > $(OBJDIR)$(@:%.test=%).out
+	$(BASHTEST) `$(CGREP) "In tool's main, probed = 1" $(OBJDIR)$(@:%.test=%).out` -eq "2"
+	$(BASHTEST) `$(CGREP) "At follow child callback" $(OBJDIR)$(@:%.test=%).out` -eq "1"
+	$(QGREP) "Terminating process in DllMain(PROCESS_ATTACH)" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+# Check pin fails when 64-bit tool applied to 32-bit application
+win_app32_tool_arch_mismatch.test: $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(XOBJDIR)win_launcher_process$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -- $(XOBJDIR)win_launcher_process$(EXE_SUFFIX) > $(OBJDIR)$(@:%.test=%).out 2>&1
+	@# Check tool load fails due to incompatible architecture
+	$(GREP) "System error 216" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+# Check pin fails when 32-bit tool applied to 64-bit application
+win_app64_tool_arch_mismatch.test: $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) $(OBJDIR)win_launcher_process$(EXE_SUFFIX)
+	-$(PIN) -t $(XOBJDIR)follow_child_tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)win_launcher_process$(EXE_SUFFIX) > $(OBJDIR)$(@:%.test=%).out 2>&1
+	@# Check tool load fails due to incompatible architecture
+	$(GREP) "System error 216" $(OBJDIR)$(@:%.test=%).out
+	$(RM) $(OBJDIR)$(@:%.test=%).out
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+# Declare all the "dummy" targets as PHONY since they are simply used as wrappers
+# and are never actually generated.
+# Each dummy build rule invokes two real build rules - one for each architecture.
+DUMMY_TOOLS := $(TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX))
+DUMMY_APPS := $(APP_ROOTS:%=$(OBJDIR)%$(EXE_SUFFIX))
+DUMMY_DLLS := $(DLL_ROOTS:%=$(OBJDIR)$(DLL_PREFIX)%$(DLL_SUFFIX))
+.PHONY: $(DUMMY_TOOLS) $(DUMMY_APPS) $(DUMMY_DLLS)
+
+ifeq ($(OS_TYPE),win)
+    TARGET32 := TARGET ia32
+    TARGET64 := TARGET intel64
+else
+    TARGET32 := TARGET=ia32
+    TARGET64 := TARGET=intel64
+endif
+
+###### Special tools' build rules ######
+
+$(DUMMY_TOOLS): %: $(XOBJDIR) $(OBJDIR)
+	$(MAKE_PREFIX_ia32) make $(TARGET32) $(@:$(OBJDIR)%_dummy$(PINTOOL_SUFFIX)=$(XOBJDIR)%$(PINTOOL_SUFFIX))
+	$(MAKE_PREFIX_intel64) make $(TARGET64) $(@:$(OBJDIR)%_dummy$(PINTOOL_SUFFIX)=$(OBJDIR)%$(PINTOOL_SUFFIX))
+
+###### Special applications' build rules ######
+
+$(DUMMY_APPS): %: $(XOBJDIR) $(OBJDIR)
+	$(MAKE_PREFIX_ia32) make $(TARGET32) $(@:$(OBJDIR)%_dummy$(EXE_SUFFIX)=$(XOBJDIR)%$(EXE_SUFFIX))
+	$(MAKE_PREFIX_intel64) make $(TARGET64) $(@:$(OBJDIR)%_dummy$(EXE_SUFFIX)=$(OBJDIR)%$(EXE_SUFFIX))
+
+$(OBJDIR)early_termination$(EXE_SUFFIX): early_termination.cpp $(OBJDIR)$(DLL_PREFIX)w_terminate_process_dll$(DLL_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(OBJDIR)w_terminate_process_dll$(LIB_SUFFIX) $(APP_LIBS)
+
+###### Special dlls' build rules ######
+
+$(DUMMY_DLLS): %: $(XOBJDIR) $(OBJDIR)
+	$(MAKE_PREFIX_ia32) make $(TARGET32) $(@:$(OBJDIR)%_dummy$(DLL_SUFFIX)=$(XOBJDIR)%$(DLL_SUFFIX))
+	$(MAKE_PREFIX_intel64) make $(TARGET64) $(@:$(OBJDIR)%_dummy$(DLL_SUFFIX)=$(OBJDIR)%$(DLL_SUFFIX))
+
+$(OBJDIR)$(DLL_PREFIX)w_terminate_process_dll$(DLL_SUFFIX): w_terminate_process_dll.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)

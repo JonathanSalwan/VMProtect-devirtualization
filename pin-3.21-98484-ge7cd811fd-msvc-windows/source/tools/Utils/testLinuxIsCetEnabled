@@ -1,0 +1,25 @@
+#! /bin/bash
+
+# This script doesn't get any arguments.
+# It prints 1 if the machine is CET enabled, and 0 otherwise.
+#
+# Check if the CPU is CET enabled.
+# For CPU, /proc/cpuinfo should have these two attributes: "shstk" and "ibt"
+# Check if the kernel is CPU enabled.
+# For kernel, the string 'cet' should be included in the kernel name
+#
+cpuinfo_shstk="`grep shstk /proc/cpuinfo`"
+cpuinfo_ibt="`grep ibt /proc/cpuinfo`"
+kernel_cet="`uname -srm | cut -d ' ' -f2 | grep cet`"
+
+if [[ $cpuinfo_shstk != '' ]]; then
+    if [[ $cpuinfo_ibt != '' ]]; then
+        if [[ $kernel_cet != '' ]]; then
+            echo 1
+            exit 0
+        fi
+    fi
+fi
+
+# System is not CET enabled - print 0
+echo 0

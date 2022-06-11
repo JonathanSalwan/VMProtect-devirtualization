@@ -1,0 +1,569 @@
+#
+# Copyright (C) 2013-2021 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := img_find_by_addr pic_image hasLinesData
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS := badmunmap
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS := badmunmap_tool
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := badmunmap_app pic_image_app hasLinesData_app hasLinesData_app_no_dbg_info
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS += imageUnload_tool split_image_linux single_segment l_vdso_image gnu_hash
+    TEST_ROOTS += jitImageUnload full_path probeImageUnload softLinkedMainImage instrument_script img_open_debug_info_unix \
+	              RtldDbgIfaceProbeWith_r_debug RtldDbgIfaceJitWith_r_debug
+    TOOL_ROOTS += full_path_tool imageLoad_tool img_open_debug_info RtldDbgIfaceTool
+    APP_ROOTS += imageUnload_app split_image_linux_app full_path_app mt_fork_app l_vdso_image_app gnu_hash_app little_malloc \
+                 RtldDbgIfaceNo_r_debug RtldDbgIfaceWith_r_debug
+    DLL_ROOTS += one two my_dll my_dll_1 split_image_linux_lib
+    OBJECT_ROOTS += split_image_linux_lib split_image_linux_app single_segment_app
+    ifeq ($(ATTACH),1)
+        TEST_ROOTS += images_on_attach launchReattachImageLoadCallbacks attachReattachImageLoadCallbacks \
+                      reattach_probed_sigtrap_block l_imageLoad
+        TOOL_ROOTS += images_on_attach_tool reattachImageLoadCallback_tool
+        APP_ROOTS += images_on_attach_app launchReattachImageLoadCallbacks_app attachReattachImageLoadCallbacks_app \
+                     single_segment_app l_imageLoad_app
+    endif
+endif
+
+# macOS*
+ifeq ($(TARGET_OS),mac)
+    TEST_TOOL_ROOTS += split_image_mac
+    TEST_ROOTS += instrument_script hasLinesData_mac img_open_debug_info_unix split_image_mac_parse_image_from_file
+    TOOL_ROOTS += img_open_debug_info
+    APP_ROOTS += split_image_mac_app little_malloc
+endif
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    TEST_TOOL_ROOTS += img_open_win
+    TEST_ROOTS += w_imageLoad load_dummy_dll load_dummy_dll_probe win_load_ntdll win_load_ntdll_probe \
+                  img_open_debug_info_win
+    TOOL_ROOTS += imageLoad_tool image_load load_dummy_dll_tool img_open_debug_info
+    APP_ROOTS += w_imageLoad_app rebase_dll load_dummy_dll win_load_ntdll w_app_launcher little_malloc
+    DLL_ROOTS += dummy_dll2 dummy_dll my_dll my_dll_1
+    OBJECT_ROOTS += hasLinesData_app hasLinesData_app_no_dbg_info
+    ifeq ($(TARGET),intel64)
+        TEST_ROOTS += x86dll
+        APP_ROOTS  += test_ip_access_app x86dll_app
+        DLL_ROOTS  += x86dll
+    endif
+    ifeq ($(HOST_ARCH),intel64)
+        ifeq ($(TARGET),ia32)
+            TEST_ROOTS += load_from_wow64_dir load_from_wow64_dir_probe
+        endif
+    endif
+    ifeq ($(COMPILER),msvc)
+		ifeq ($(VisualStudioVersion),16.0)
+			TEST_TOOL_ROOTS += img_check_cet
+		endif
+	endif
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    # Old linkers don't support -Ttext-segment
+    ifeq ($(shell $(APP_CXX) -Wl,--help | $(QGREP) -- -Ttext-segment || echo no),no)
+        TEST_TOOL_ROOTS := $(filter-out split_image_linux, $(TEST_TOOL_ROOTS))
+        APP_ROOTS := $(filter-out split_image_linux_app, $(APP_ROOTS))
+        DLL_ROOTS := $(filter-out split_image_linux_lib, $(DLL_ROOTS))
+        OBJECT_ROOTS := $(filter-out split_image_linux_app split_image_linux_lib, $(OBJECT_ROOTS))
+    endif
+
+    # Disabling l_vdso_image test on machines which do not support VDSO
+    ifeq ($(TARGET),intel64)
+        ifeq ($(shell od -t x8 /proc/self/auxv | awk 'NR==1{print $2}' | $(QGREP) 0000000000000021 || echo no),no)
+            TEST_TOOL_ROOTS := $(filter-out l_vdso_image, $(TEST_TOOL_ROOTS))
+            APP_ROOTS := $(filter-out l_vdso_image_app, $(APP_ROOTS))
+        endif
+    else
+        ifeq ($(shell od -t x4 /proc/self/auxv | awk 'NR==1{print $4}' | $(QGREP) 00000021 || echo no),no)
+            TEST_TOOL_ROOTS := $(filter-out l_vdso_image, $(TEST_TOOL_ROOTS))
+            APP_ROOTS := $(filter-out l_vdso_image_app, $(APP_ROOTS))
+        endif
+    endif
+
+    # sles10 linkers don't support --hash-style=gnu
+    ifeq ($(shell $(CC) -Wl,--help | $(QGREP) -- --hash-style || echo no),no)
+        TEST_TOOL_ROOTS := $(filter-out gnu_hash, $(TEST_TOOL_ROOTS))
+        APP_ROOTS := $(filter-out gnu_hash_app, $(APP_ROOTS))
+    endif
+endif
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+###### Define the serial subset ######
+
+# Defines which tests need to be run serially as may cause issues when running in parallel 
+ifeq ($(TARGET_OS),windows)
+    SERIAL_SUBSET :=  hasLinesData
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+ifeq ($(TARGET_OS),mac)
+    HASLINESDATA_DEBUG_FILE := hasLinesData_app$(EXE_SUFFIX):$(OBJDIR)hasLinesData_app$(EXE_SUFFIX).dSYM/Contents/Resources/DWARF/hasLinesData_app$(EXE_SUFFIX)
+    DWARF_FILE_KNOB := -dwarf_file $(HASLINESDATA_DEBUG_FILE)
+endif
+
+hasLinesData.test: $(OBJDIR)hasLinesData$(PINTOOL_SUFFIX) $(OBJDIR)hasLinesData_app$(EXE_SUFFIX) $(OBJDIR)hasLinesData_app_no_dbg_info$(EXE_SUFFIX)
+	$(PIN) -t $< $(DWARF_FILE_KNOB) -state debug -- $(OBJDIR)hasLinesData_app$(EXE_SUFFIX)
+	$(PIN) -t $< -state no_debug -- $(OBJDIR)hasLinesData_app_no_dbg_info$(EXE_SUFFIX)
+	echo "NOTE : The following two Pin executions should fail. Errors in output should be ignored."
+	!($(PIN) -t $< $(DWARF_FILE_KNOB) -state no_debug -- $(OBJDIR)hasLinesData_app$(EXE_SUFFIX)) > $(OBJDIR)hasLinesData.out
+	!($(PIN) -t $< -state debug -- $(OBJDIR)hasLinesData_app_no_dbg_info$(EXE_SUFFIX)) > $(OBJDIR)hasLinesData.out
+	$(RM) $(OBJDIR)hasLinesData.out
+
+ifeq ($(TARGET_OS),mac)
+    NON_DEFAULT_DIR := $(OBJDIR)DebugInfoDir/
+    HASLINESDATA_DEBUG_FILE_NON_DEFAULT_DIR := hasLinesData_app$(EXE_SUFFIX):$(NON_DEFAULT_DIR)hasLinesData_app$(EXE_SUFFIX)
+    DWARF_FILE_KNOB_NON_DEFAULT_DIR := -dwarf_file $(HASLINESDATA_DEBUG_FILE_NON_DEFAULT_DIR)
+endif
+
+#testing:
+# 1. Using PIN_GetSourceLocation() without supplying the DWARF file path
+# 2. Changing the location of the DWARF file (not the regular path relative to the image file) and check if the knob working well.
+hasLinesData_mac.test: $(OBJDIR)hasLinesData$(PINTOOL_SUFFIX) $(OBJDIR)hasLinesData_app$(EXE_SUFFIX)
+	$(PIN) -t $< -state debug -- $(OBJDIR)hasLinesData_app$(EXE_SUFFIX)
+	mkdir -p $(NON_DEFAULT_DIR)
+	$(MV) $(OBJDIR)hasLinesData_app$(EXE_SUFFIX).dSYM/Contents/Resources/DWARF/hasLinesData_app$(EXE_SUFFIX) $(NON_DEFAULT_DIR)
+	$(PIN) -t $< $(DWARF_FILE_KNOB_NON_DEFAULT_DIR) -state debug -- $(OBJDIR)hasLinesData_app$(EXE_SUFFIX)
+	$(MV) $(NON_DEFAULT_DIR)hasLinesData_app$(EXE_SUFFIX) $(OBJDIR)hasLinesData_app$(EXE_SUFFIX).dSYM/Contents/Resources/DWARF
+
+full_path.test: $(OBJDIR)full_path_tool$(PINTOOL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)full_path_app$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)full_path_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)full_path.out \
+	  -- $(OBJDIR)full_path_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX)
+	$(GREP) "my_dll" $(OBJDIR)full_path.out | $(GREP) ^/
+	$(RM) $(OBJDIR)full_path.out
+
+l_imageLoad.test: $(OBJDIR)imageLoad_tool$(PINTOOL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) $(OBJDIR)l_imageLoad_app$(EXE_SUFFIX)
+	$(SET_DLL_PATH) $(OBJDIR)l_imageLoad_app$(EXE_SUFFIX) $(DLL_PREFIX)my_dll$(DLL_SUFFIX) \
+	  $(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) $(PIN) -probe -t $(OBJDIR)imageLoad_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)l_imageLoad.out
+	$(GREP) "in image callback of image:" $(OBJDIR)l_imageLoad.out | $(QGREP) "$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX)"
+	$(RM) $(OBJDIR)l_imageLoad.out
+
+softLinkedMainImage.test: $(OBJDIR)imageLoad_tool$(PINTOOL_SUFFIX) $(TESTAPP)
+	ln -s `$(READLINK) -f $(TESTAPP)` $(OBJDIR)unique_name
+	$(PIN) -t $(OBJDIR)imageLoad_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)softLinkedMainImage.out -- $(OBJDIR)unique_name makefile $(OBJDIR)$(@:.test=.makefile.copy)
+	$(QGREP) unique_name $(OBJDIR)softLinkedMainImage.out; $(BASHTEST) $$? != 0
+	$(RM) $(OBJDIR)softLinkedMainImage.out $(OBJDIR)unique_name $(OBJDIR)$(@:.test=.makefile.copy)
+
+images_on_attach.test: $(OBJDIR)images_on_attach_tool$(PINTOOL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)images_on_attach_app$(EXE_SUFFIX) $(ATTACH_LAUNCHER)
+	$(ATTACH_LAUNCHER) $(PIN) -t $(OBJDIR)images_on_attach_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)images_on_attach.log \
+	    -- $(OBJDIR)images_on_attach_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) \
+	      > $(OBJDIR)images_on_attach.out
+	$(QGREP) "libdl" $(OBJDIR)images_on_attach.log
+	$(QGREP) "libstdc++" $(OBJDIR)images_on_attach.log
+	$(QGREP) "libm" $(OBJDIR)images_on_attach.log
+	$(QGREP) "libgcc_s" $(OBJDIR)images_on_attach.log
+	$(QGREP) "libc" $(OBJDIR)images_on_attach.log
+	$(QGREP) "libutil" $(OBJDIR)images_on_attach.log
+	$(QGREP) "my_dll" $(OBJDIR)images_on_attach.log
+	$(RM) $(OBJDIR)images_on_attach.log $(OBJDIR)images_on_attach.out
+
+l_vdso_image.test: $(OBJDIR)l_vdso_image$(PINTOOL_SUFFIX) $(OBJDIR)l_vdso_image_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)l_vdso_image$(PINTOOL_SUFFIX) -o $(OBJDIR)l_vdso_image.log \
+	    -- $(OBJDIR)l_vdso_image_app$(EXE_SUFFIX) > $(OBJDIR)l_vdso_image.out
+	$(RM) $(OBJDIR)l_vdso_image.log $(OBJDIR)l_vdso_image.out
+
+launchReattachImageLoadCallbacks.test: $(OBJDIR)launchReattachImageLoadCallbacks_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) $(OBJDIR)reattachImageLoadCallback_tool$(PINTOOL_SUFFIX)
+	$(SET_DLL_PATH) $(PIN) -t $(OBJDIR)reattachImageLoadCallback_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)launchReattachImageLoadCallbacks.out -- $(OBJDIR)launchReattachImageLoadCallbacks_app$(EXE_SUFFIX) \
+	    $(OBJDIR)$(DLL_PREFIX)my_dll$(PINTOOL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(PINTOOL_SUFFIX)
+	$(QGREP) "$(DLL_PREFIX)my_dll$(DLL_SUFFIX) in iteration2" $(OBJDIR)launchReattachImageLoadCallbacks.out
+	$(QGREP) "$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) in iteration2" $(OBJDIR)launchReattachImageLoadCallbacks.out
+	$(RM) $(OBJDIR)launchReattachImageLoadCallbacks.out
+
+attachReattachImageLoadCallbacks.test: $(OBJDIR)attachReattachImageLoadCallbacks_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) $(OBJDIR)reattachImageLoadCallback_tool$(PINTOOL_SUFFIX)
+	$(SET_DLL_PATH) $(OBJDIR)attachReattachImageLoadCallbacks_app$(EXE_SUFFIX) \
+	  $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) $(PIN) -probe \
+	  -t $(OBJDIR)reattachImageLoadCallback_tool$(PINTOOL_SUFFIX) $(OBJDIR)attachReattachImageLoadCallbacks.out 0
+	$(QGREP) "$(DLL_PREFIX)my_dll$(DLL_SUFFIX) in iteration2" $(OBJDIR)attachReattachImageLoadCallbacks.out
+	$(QGREP) "$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) in iteration2" $(OBJDIR)attachReattachImageLoadCallbacks.out
+	$(RM) $(OBJDIR)attachReattachImageLoadCallbacks.out
+
+reattach_probed_sigtrap_block.test: $(OBJDIR)attachReattachImageLoadCallbacks_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) $(OBJDIR)reattachImageLoadCallback_tool$(PINTOOL_SUFFIX)
+	$(SET_DLL_PATH) $(OBJDIR)attachReattachImageLoadCallbacks_app$(EXE_SUFFIX) \
+	  $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) $(PIN) -probe \
+	  -t $(OBJDIR)reattachImageLoadCallback_tool$(PINTOOL_SUFFIX) $(OBJDIR)reattach_probed_sigtrap_block.out 1
+	$(QGREP) "$(DLL_PREFIX)my_dll$(DLL_SUFFIX) in iteration2" $(OBJDIR)reattach_probed_sigtrap_block.out
+	$(QGREP) "$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) in iteration2" $(OBJDIR)reattach_probed_sigtrap_block.out
+	$(RM) $(OBJDIR)reattach_probed_sigtrap_block.out
+
+jitImageUnload.test: $(OBJDIR)imageUnload_tool$(PINTOOL_SUFFIX) $(OBJDIR)imageUnload_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)two$(DLL_SUFFIX)
+	export LD_LIBRARY_PATH=$$LD_LIBRARY_PATH:.; $(PIN) -t $(OBJDIR)imageUnload_tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)imageUnload_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX) > $(OBJDIR)jitImageUnload.out
+	$(QGREP) "one.so is mapped in the memory" $(OBJDIR)jitImageUnload.out
+	$(RM) $(OBJDIR)jitImageUnload.out
+
+probeImageUnload.test: $(OBJDIR)imageUnload_tool$(PINTOOL_SUFFIX) $(OBJDIR)imageUnload_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)two$(DLL_SUFFIX)
+	export LD_LIBRARY_PATH=$$LD_LIBRARY_PATH:.; $(PIN) -probe -t $(OBJDIR)imageUnload_tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)imageUnload_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX) > $(OBJDIR)probeImageUnload.out
+	$(QGREP) "one.so is mapped in the memory" $(OBJDIR)probeImageUnload.out
+	$(RM) $(OBJDIR)probeImageUnload.out
+
+# Tests delivery of dll load / unload events for dynamically loaded images in JIT mode
+load_dummy_dll.test: $(OBJDIR)load_dummy_dll_tool$(PINTOOL_SUFFIX) $(OBJDIR)load_dummy_dll$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)dummy_dll$(DLL_SUFFIX)
+	$(PIN) -t $(OBJDIR)load_dummy_dll_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)load_dummy_dll.out \
+	  -- $(OBJDIR)load_dummy_dll$(EXE_SUFFIX)
+	$(CGREP) -i "dummy_dll.dll loaded" $(OBJDIR)load_dummy_dll.out | $(QGREP) "2"
+	$(CGREP) -i "dummy_dll.dll unloaded" $(OBJDIR)load_dummy_dll.out | $(QGREP) "2"
+	$(RM) $(OBJDIR)load_dummy_dll.out
+
+# Tests delivery of dll load / unload events for dynamically loaded images in probe mode
+load_dummy_dll_probe.test: $(OBJDIR)load_dummy_dll_tool$(PINTOOL_SUFFIX) $(OBJDIR)load_dummy_dll$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)dummy_dll$(DLL_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)load_dummy_dll_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)load_dummy_dll_probe.out \
+	  -- $(OBJDIR)load_dummy_dll$(EXE_SUFFIX)
+	$(CGREP) -i "dummy_dll.dll loaded" $(OBJDIR)load_dummy_dll_probe.out | $(QGREP) "2"
+	$(CGREP) -i "dummy_dll.dll unloaded" $(OBJDIR)load_dummy_dll_probe.out | $(QGREP) "2"
+	$(RM) $(OBJDIR)load_dummy_dll_probe.out
+
+w_imageLoad.test: $(OBJDIR)imageLoad_tool$(PINTOOL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) $(OBJDIR)w_imageLoad_app$(EXE_SUFFIX) $(OBJDIR)w_app_launcher$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)pid_w_imageLoad_app.log
+	$(OBJDIR)w_app_launcher$(EXE_SUFFIX) $(OBJDIR)w_imageLoad_app$(EXE_SUFFIX) > $(OBJDIR)pid_w_imageLoad_app.log
+	$(PIN) -probe -pid `cat $(OBJDIR)pid_w_imageLoad_app.log` -t $(OBJDIR)imageLoad_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)w_imageLoad.out
+	$(QGREP) "$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX)" $(OBJDIR)w_imageLoad.out
+	$(RM) -f $(OBJDIR)pid_w_imageLoad_app.log $(OBJDIR)w_imageLoad.out
+
+# Tests proper loading of ntdll.dll on Windows in JIT mode
+win_load_ntdll.test: $(OBJDIR)image_load$(PINTOOL_SUFFIX) $(OBJDIR)win_load_ntdll$(EXE_SUFFIX)
+	$(PIN) -logfile $(OBJDIR)win_load_ntdll.log -t $(OBJDIR)image_load$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)win_load_ntdll$(EXE_SUFFIX) > $(OBJDIR)win_load_ntdll.out 2>&1
+	$(QGREP) "Success" $(OBJDIR)win_load_ntdll.out
+	-$(RM) $(OBJDIR)win_load_ntdll.out $(OBJDIR)win_load_ntdll.log
+
+# Tests proper loading of ntdll.dll on Windows in probe mode
+win_load_ntdll_probe.test: $(OBJDIR)image_load$(PINTOOL_SUFFIX) $(OBJDIR)win_load_ntdll$(EXE_SUFFIX)
+	$(PIN) -probe -logfile $(OBJDIR)win_load_ntdll_probe.log -t $(OBJDIR)image_load$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)win_load_ntdll$(EXE_SUFFIX) > $(OBJDIR)win_load_ntdll_probe.out 2>&1
+	$(QGREP) "Success" $(OBJDIR)win_load_ntdll_probe.out
+	-$(RM) $(OBJDIR)win_load_ntdll_probe.out $(OBJDIR)win_load_ntdll_probe.log
+
+load_from_wow64_dir.test: $(OBJDIR)image_load$(PINTOOL_SUFFIX) $(OBJDIR)load_dummy_dll$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)dummy_dll$(DLL_SUFFIX)
+	$(PIN) -t $(OBJDIR)image_load$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)load_dummy_dll$(EXE_SUFFIX) > $(OBJDIR)load_from_wow64_dir.out 2>&1
+	# system32 should not appear in names of loaded system DLLs
+	$(QGREP) -i "system32" $(OBJDIR)load_from_wow64_dir.out; $(BASHTEST) $$? != 0
+	$(RM) $(OBJDIR)load_from_wow64_dir.out
+
+load_from_wow64_dir_probe.test: $(OBJDIR)image_load$(PINTOOL_SUFFIX) $(OBJDIR)load_dummy_dll$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)dummy_dll$(DLL_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)image_load$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)load_dummy_dll$(EXE_SUFFIX) > $(OBJDIR)load_from_wow64_dir_probe.out 2>&1
+	# system32 should not appear in names of loaded system DLLs
+	$(QGREP) -i "system32" $(OBJDIR)load_from_wow64_dir_probe.out; $(BASHTEST) $$? != 0
+	$(RM) $(OBJDIR)load_from_wow64_dir_probe.out
+
+# Tests IMG_Open on Windows
+img_open_win.test: $(OBJDIR)img_open_win$(PINTOOL_SUFFIX) $(OBJDIR)rebase_dll$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)dummy_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)dummy_dll2$(DLL_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)img_open_win$(PINTOOL_SUFFIX) -o $(OBJDIR)img_open_win.out -- $(OBJDIR)rebase_dll$(EXE_SUFFIX)
+	$(CGREP) -i "nothing" $(OBJDIR)img_open_win.out | $(QGREP) "3"
+	$(RM) $(OBJDIR)img_open_win.out
+
+# Tests IMG_Open() on Windows with debug information queries
+img_open_debug_info_win.test: $(OBJDIR)img_open_debug_info$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX) $(HELLO_APP)
+	$(PIN) -t $(OBJDIR)img_open_debug_info$(PINTOOL_SUFFIX) -i $(OBJDIR)little_malloc$(EXE_SUFFIX) -o $(OBJDIR)$(@:.test=.out) -- $(HELLO_APP)
+	$(RM) $(OBJDIR)$(@:.test=.out)
+
+ifeq ($(TARGET_OS),mac) 
+    LM_DWARF_FILE_KNOB := -dwarf_file little_malloc$(EXE_SUFFIX):$(OBJDIR)little_malloc$(EXE_SUFFIX).dSYM/Contents/Resources/DWARF/little_malloc$(EXE_SUFFIX)
+endif
+
+# Tests IMG_Open() on Unix with debug information queries
+img_open_debug_info_unix.test: $(OBJDIR)img_open_debug_info$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX) $(HELLO_APP)
+	$(PIN) -t $(OBJDIR)img_open_debug_info$(PINTOOL_SUFFIX) $(LM_DWARF_FILE_KNOB) -i $(OBJDIR)little_malloc$(EXE_SUFFIX) \
+	-o $(OBJDIR)$(@:.test=.out) -r -- $(HELLO_APP)
+	$(RM) $(OBJDIR)$(@:.test=.out)
+
+# Tests proper processing of IA-32 dll loaded in Intel(R) 64 process on Windows
+x86dll.test: $(OBJDIR)load_dummy_dll_tool$(PINTOOL_SUFFIX) $(OBJDIR)x86dll_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)x86dll$(DLL_SUFFIX)
+	$(PIN) -t $(OBJDIR)load_dummy_dll_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)x86dll.out -- $(OBJDIR)x86dll_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)x86dll.out
+
+badmunmap.test: $(OBJDIR)badmunmap_tool$(PINTOOL_SUFFIX) $(OBJDIR)badmunmap_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)badmunmap_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:.test=.out) \
+	  -- $(OBJDIR)badmunmap_app$(EXE_SUFFIX) > $(OBJDIR)badmunmap.log 2>&1
+	$(QGREP) "TOOL: SUCCESS" $(OBJDIR)$(@:.test=.out)
+	$(RM) $(OBJDIR)$(@:.test=.out) $(OBJDIR)badmunmap.log
+
+split_image_mac.test: $(OBJDIR)split_image_mac$(PINTOOL_SUFFIX) $(OBJDIR)split_image_mac_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)split_image_mac$(PINTOOL_SUFFIX) -o $(OBJDIR)split_image_mac.out -- $(OBJDIR)split_image_mac_app$(EXE_SUFFIX) \
+	  >& $(OBJDIR)split_image_mac_app.out
+	$(PYTHON) region_compare.py $(OBJDIR)split_image_mac.out $(OBJDIR)split_image_mac_app.out
+	$(RM) $(OBJDIR)split_image_mac.out $(OBJDIR)split_image_mac_app.out
+
+# Testing -prefer_parse_macho_from_mem 0 with this chosen test
+split_image_mac_parse_image_from_file.test: $(OBJDIR)split_image_mac$(PINTOOL_SUFFIX) $(OBJDIR)split_image_mac_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)split_image_mac$(PINTOOL_SUFFIX) -prefer_parse_macho_from_mem 0 -o $(OBJDIR)split_image_mac_parse_image_from_file.out \
+	  -- $(OBJDIR)split_image_mac_app$(EXE_SUFFIX) >& $(OBJDIR)split_image_mac_parse_image_from_file_app.out
+	$(PYTHON) region_compare.py $(OBJDIR)split_image_mac_parse_image_from_file.out $(OBJDIR)split_image_mac_parse_image_from_file_app.out
+	$(RM) $(OBJDIR)split_image_mac_parse_image_from_file.out $(OBJDIR)split_image_mac_parse_image_from_file_app.out
+
+split_image_linux.test: $(OBJDIR)split_image_linux$(PINTOOL_SUFFIX) $(OBJDIR)split_image_linux_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)split_image_linux_lib$(DLL_SUFFIX)
+	$(PIN) -t $(OBJDIR)split_image_linux$(PINTOOL_SUFFIX) -o $(OBJDIR)split_image_linux.out \
+	  -- $(OBJDIR)split_image_linux_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)split_image_linux_lib$(DLL_SUFFIX) \
+	     > $(OBJDIR)split_image_linux_app.out 2>&1
+	$(PYTHON) region_compare.py $(OBJDIR)split_image_linux.out $(OBJDIR)split_image_linux_app.out
+	$(RM) $(OBJDIR)split_image_linux.out $(OBJDIR)split_image_linux_app.out
+
+single_segment.test: $(OBJDIR)single_segment$(PINTOOL_SUFFIX) $(OBJDIR)single_segment_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)single_segment$(PINTOOL_SUFFIX) -- $(OBJDIR)single_segment_app$(EXE_SUFFIX)
+
+instrument_script.test: $(HELLO_APP) | dir
+	echo "#!" > $(OBJDIR)script.txt
+	echo $(HELLO_APP) >> $(OBJDIR)script.txt
+	$(CMD_PREFIX) cat $(OBJDIR)script.txt | $(CMD_PREFIX) tr -d "\n" > $(OBJDIR)script.sh
+	echo "" >> $(OBJDIR)script.sh
+	$(CMD_PREFIX) chmod u+rx $(OBJDIR)script.sh
+	$(PIN) -- $(OBJDIR)script.sh > $(OBJDIR)instrument_script.out 2>&1
+	$(QGREP) "Hello world" $(OBJDIR)instrument_script.out
+	$(RM) $(OBJDIR)instrument_script.out $(OBJDIR)script.*
+
+gnu_hash.test: $(OBJDIR)gnu_hash$(PINTOOL_SUFFIX) $(OBJDIR)gnu_hash_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)gnu_hash$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)gnu_hash_app$(EXE_SUFFIX) > $(OBJDIR)gnu_hash.out 2>&1
+	$(QGREP) ".gnu.hash was found" $(OBJDIR)gnu_hash.out
+	$(RM) $(OBJDIR)gnu_hash.out
+
+pic_image.test: $(OBJDIR)pic_image$(PINTOOL_SUFFIX) $(OBJDIR)pic_image_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)pic_image$(PINTOOL_SUFFIX) -o $(OBJDIR)pic_image.out \
+	  -- $(OBJDIR)pic_image_app$(EXE_SUFFIX) > $(OBJDIR)pic_image_app.out 2>&1
+	$(RM) $(OBJDIR)pic_image_app.out $(OBJDIR)pic_image.out
+
+img_check_cet.test: $(OBJDIR)img_check_cet$(PINTOOL_SUFFIX) $(OBJDIR)cet_compatible_image$(EXE_SUFFIX) $(OBJDIR)cet_not_compatible_image$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)img_check_cet$(PINTOOL_SUFFIX) -s -m cet_compatible_image.exe \
+	  -- $(OBJDIR)cet_compatible_image$(EXE_SUFFIX) > $(OBJDIR)cet_compatible_image.out 2>&1
+	$(PIN) -t $(OBJDIR)img_check_cet$(PINTOOL_SUFFIX) -m cet_not_compatible_image.exe  \
+	  -- $(OBJDIR)cet_not_compatible_image$(EXE_SUFFIX) > $(OBJDIR)cet_not_compatible_image.out 2>&1
+	$(RM) $(OBJDIR)cet_compatible_image.out
+	$(RM) $(OBJDIR)cet_not_compatible_image.out
+
+# In each of the RtldDbgIface tests, we create a reference file containing the images loaded. We create this reference
+# by using a pin tool in jit mode where the application doesn't contain a _r_debug symbol.  When an application contains a symbol called
+# _r_debug, at some point the linker will start using this variable as an interface for signaling load\unload events instead of the _r_debug
+# the linker itself contains. This caused pin to miss events as he tracks the _r_debug in the linker and not in the executable. The following
+# tests make sure that the fix that addresses this issue is working correctly by specifically insturmenting applications which contain the
+# _r_debug and compare pin's output to cases where the same applications are running without the _r_debug symbol.
+RtldDbgIfaceJitWith_r_debug.test : $(OBJDIR)                                      \
+                                   $(OBJDIR)RtldDbgIfaceWith_r_debug$(EXE_SUFFIX) \
+                                   $(OBJDIR)RtldDbgIfaceNo_r_debug$(EXE_SUFFIX)   \
+                                   $(OBJDIR)RtldDbgIfaceTool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)RtldDbgIfaceTool$(DLL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.out) -- \
+		$(OBJDIR)RtldDbgIfaceWith_r_debug$(EXE_SUFFIX) > /dev/null 2>&1
+	$(PIN) -t $(OBJDIR)RtldDbgIfaceTool$(DLL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.ref) -- \
+		$(OBJDIR)RtldDbgIfaceNo_r_debug$(EXE_SUFFIX) > /dev/null 2>&1
+    # Make sure that at least one of the outputs is not empty
+	test -s $(OBJDIR)$(@:.test=.out)
+	$(CMP) $(OBJDIR)$(@:.test=.out) $(@:%.test=$(OBJDIR)%.ref)
+	$(RM) $(@:%.test=$(OBJDIR)%.out)
+	$(RM) $(@:%.test=$(OBJDIR)%.ref)
+
+# Documentation: see RtldDbgIfaceJitWith_r_debug.test
+RtldDbgIfaceProbeWith_r_debug.test : $(OBJDIR)                                      \
+                                     $(OBJDIR)RtldDbgIfaceWith_r_debug$(EXE_SUFFIX) \
+                                     $(OBJDIR)RtldDbgIfaceNo_r_debug$(EXE_SUFFIX)   \
+                                     $(OBJDIR)RtldDbgIfaceTool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)RtldDbgIfaceTool$(DLL_SUFFIX) -probe -o $(@:%.test=$(OBJDIR)%.out) -- \
+		$(OBJDIR)RtldDbgIfaceWith_r_debug$(EXE_SUFFIX) > /dev/null 2>&1
+	$(PIN) -t $(OBJDIR)RtldDbgIfaceTool$(DLL_SUFFIX) -o $(@:%.test=$(OBJDIR)%.ref) -- \
+		$(OBJDIR)RtldDbgIfaceNo_r_debug$(EXE_SUFFIX) > /dev/null 2>&1
+	test -s $(OBJDIR)$(@:.test=.out)
+	$(CMP) $(OBJDIR)$(@:.test=.out) $(@:%.test=$(OBJDIR)%.ref)
+	$(RM) $(@:%.test=$(OBJDIR)%.out)
+	$(RM) $(@:%.test=$(OBJDIR)%.ref)
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special applications' build rules ######
+
+# On Windows, build the objects separately to allow parallel compilation.
+ifeq ($(TARGET_OS),windows)
+$(OBJDIR)hasLinesData_app$(EXE_SUFFIX): $(OBJDIR)hasLinesData_app$(OBJ_SUFFIX)
+	$(LINKER) $(LINK_EXE)$@ $< $(APP_LDFLAGS) $(DBG_INFO_LD_ALWAYS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)hasLinesData_app_no_dbg_info$(EXE_SUFFIX): $(OBJDIR)hasLinesData_app_no_dbg_info$(OBJ_SUFFIX)
+	$(LINKER) $(LINK_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+else
+$(OBJDIR)hasLinesData_app$(EXE_SUFFIX): hasLinesData_app_main.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DBG_INFO_LD_ALWAYS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)hasLinesData_app_no_dbg_info$(EXE_SUFFIX): $(OBJDIR)hasLinesData_app$(EXE_SUFFIX)
+	$(CP) $< $@
+	$(STRIP) $@
+endif
+
+$(OBJDIR)rebase_dll2$(EXE_SUFFIX): rebase_dll.c dummy_dll.c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) /FIXED:NO /BASE:0 $(APP_LIBS)
+
+$(OBJDIR)imageUnload_app$(EXE_SUFFIX): imageUnload_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)w_imageLoad_app$(EXE_SUFFIX): w_imageLoad_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)launchReattachImageLoadCallbacks_app$(EXE_SUFFIX): launchReattachImageLoadCallbacks_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)attachReattachImageLoadCallbacks_app$(EXE_SUFFIX): attachReattachImageLoadCallbacks_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)l_imageLoad_app$(EXE_SUFFIX): l_imageLoad_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)badmunmap_app$(EXE_SUFFIX): badmunmap_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)images_on_attach_app$(EXE_SUFFIX): images_on_attach_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+ifeq ($(TARGET_OS),linux)
+    ifneq ($(shell $(APP_CXX) -Wl,--version 2>/dev/null | $(GREP) "GNU gold"),)
+        SPLIT_IMAGE_ARGS := -Wl,-Ttext,0x200000 -Wl,-Tdata,0xf000000
+    else
+        SPLIT_IMAGE_ARGS := -Wl,-Ttext-segment=0x200000 -Wl,-section-start,.init_array=0xf000e10 
+    endif
+endif
+
+$(OBJDIR)split_image_linux_app$(EXE_SUFFIX): $(OBJDIR)split_image_linux_app$(OBJ_SUFFIX) $(OBJDIR)$(DLL_PREFIX)split_image_linux_lib$(DLL_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $(OBJDIR)split_image_linux_app$(OBJ_SUFFIX) $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(SPLIT_IMAGE_ARGS) $(OBJDIR)$(DLL_PREFIX)split_image_linux_lib$(DLL_SUFFIX) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)single_segment_app$(EXE_SUFFIX): $(OBJDIR)single_segment_app$(OBJ_SUFFIX)
+	$(LINKER) $(APP_LDFLAGS_LINK_ASM) $(LINK_EXE)$@ $(STATIC) $(NO_STDLIBS) -Wl,-entry=_start $<
+
+$(OBJDIR)gnu_hash_app$(EXE_SUFFIX): gnu_hash_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) -Wl,--hash-style=gnu
+
+$(OBJDIR)pic_image_app$(EXE_SUFFIX): pic_image_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(PIC) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(PIE)
+
+$(OBJDIR)little_malloc$(EXE_SUFFIX): little_malloc.c
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)cet_compatible_image$(EXE_SUFFIX): little_malloc.c
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) /CETCOMPAT
+
+$(OBJDIR)cet_not_compatible_image$(EXE_SUFFIX): little_malloc.c
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) /CETCOMPAT:NO
+
+$(OBJDIR)RtldDbgIfaceWith_r_debug$(EXE_SUFFIX) : RtldDbgIfaceApp.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS) -DR_DEBUG_INSTANCE
+	
+$(OBJDIR)RtldDbgIfaceNo_r_debug$(EXE_SUFFIX) : RtldDbgIfaceApp.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+###### Special objects' build rules ######
+
+$(OBJDIR)my_dll$(OBJ_SUFFIX): my_dll.c
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)split_image_linux_lib$(OBJ_SUFFIX): split_image_linux_lib.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)split_image_linux_app$(OBJ_SUFFIX): split_image_linux_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(PIC) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)single_segment_app$(OBJ_SUFFIX): single_segment_app$(ASM_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(ASMCPP) -Wa,-R -I$(TOOLS_ROOT)/InstLib $(COMP_OBJ)$@ $<
+
+$(OBJDIR)hasLinesData_app$(OBJ_SUFFIX): hasLinesData_app_main.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(DBG_INFO_CXX_ALWAYS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)hasLinesData_app_no_dbg_info$(OBJ_SUFFIX): hasLinesData_app_main.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+###### Special dlls' build rules ######
+
+$(OBJDIR)$(DLL_PREFIX)dummy_dll$(DLL_SUFFIX): dummy_dll.c
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) /NOENTRY /BASE:0x10000000 $(APP_LIBS)
+
+$(OBJDIR)$(DLL_PREFIX)dummy_dll2$(DLL_SUFFIX): $(OBJDIR)$(DLL_PREFIX)dummy_dll$(DLL_SUFFIX)
+	cp $< $@
+
+$(OBJDIR)$(DLL_PREFIX)x86dll$(DLL_SUFFIX):
+	touch $(OBJDIR)x86dll.def
+	$(LINKER) $(LINK_EXE)$@ /MACHINE:X86 /DEF:$(OBJDIR)x86dll.def /NOLOGO /NOENTRY /MANIFEST:NO $(DLL_LDFLAGS)
+
+$(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX): one.c
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)$(DLL_PREFIX)two$(DLL_SUFFIX): two.c
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX): $(OBJDIR)my_dll$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX): $(OBJDIR)my_dll$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)$(DLL_PREFIX)split_image_linux_lib$(DLL_SUFFIX): $(OBJDIR)split_image_linux_lib$(OBJ_SUFFIX)
+	$(APP_CC) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)

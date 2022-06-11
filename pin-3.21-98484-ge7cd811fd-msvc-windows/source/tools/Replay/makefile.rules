@@ -1,0 +1,163 @@
+#
+# Copyright (C) 2012-2021 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := replay_syscall record_imageload2 call_function_natively
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS := cross_os_replay
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := call_function_natively_app
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS += set_loader_info_shift
+endif
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    TEST_TOOL_ROOTS += win_replay_exception
+    APP_ROOTS += win_exception
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+# See Mantis #4212
+ifeq ($(TARGET_OS),windows)
+    ifeq ($(TARGET),intel64)
+        ifeq ($(VisualStudioVersion),15.0)
+            TEST_TOOL_ROOTS := $(filter-out record_imageload2, $(TEST_TOOL_ROOTS))
+        endif
+        # Fails also with MSVC14. Once resolved with MSVC15, try to enable this one too.
+        ifeq ($(VisualStudioVersion),14.0)
+            TEST_TOOL_ROOTS := $(filter-out record_imageload2, $(TEST_TOOL_ROOTS))
+        endif
+    endif
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+# Test replaying the same exception (Windows only)
+win_replay_exception.test: $(OBJDIR)win_replay_exception$(PINTOOL_SUFFIX) $(OBJDIR)win_exception$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)win_replay_exception$(PINTOOL_SUFFIX) -- $(OBJDIR)win_exception$(EXE_SUFFIX)
+	$(RM) win_replay_exception.out 
+
+# Test replaying the same system call
+replay_syscall.test: $(OBJDIR)replay_syscall$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)replay_syscall$(PINTOOL_SUFFIX) -- $(TESTAPP) makefile $(OBJDIR)replay_syscall.makefile.copy
+	$(RM) replay_syscall.out
+	$(RM) -f $(OBJDIR)replay_syscall.makefile.copy # this might not be generated so we use the -f flag 
+
+call_function_natively.test: $(OBJDIR)call_function_natively$(PINTOOL_SUFFIX) $(OBJDIR)call_function_natively_app$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)call_function_natively_app.out $(OBJDIR)call_function_natively.out
+	$(PIN) -t $(OBJDIR)call_function_natively$(PINTOOL_SUFFIX) -o $(OBJDIR)call_function_natively.out \
+	  -- $(OBJDIR)call_function_natively_app$(EXE_SUFFIX) > $(OBJDIR)call_function_natively_app.out 2>&1
+	$(QGREP) "hello world" $(OBJDIR)call_function_natively_app.out
+	$(DIFF) call_function_natively.reference $(OBJDIR)call_function_natively.out
+	$(RM) $(OBJDIR)call_function_natively_app.out $(OBJDIR)call_function_natively.out
+
+# Test record and replay of image load/unload events
+record_imageload2.test: $(OBJDIR)record_imageload2$(PINTOOL_SUFFIX) $(TESTAPP)
+	# Record the image load/unload information
+	$(PIN) -t $(OBJDIR)record_imageload2$(PINTOOL_SUFFIX) -p $(OBJDIR)record_imageload2 \
+	  -- $(TESTAPP) makefile $(OBJDIR)record_imageload2.makefile.copy
+	# Replay it
+	$(PIN) -t $(OBJDIR)record_imageload2$(PINTOOL_SUFFIX) -r -p $(OBJDIR)record_imageload2 \
+	  -- $(TESTAPP) makefile $(OBJDIR)record_imageload2.makefile.copy
+	# The output log should be the same at record and replay time
+	$(DIFF) $(OBJDIR)record_imageload2_rec.out $(OBJDIR)record_imageload2_play.out
+	$(RM) $(OBJDIR)record_imageload2_rec.out $(OBJDIR)record_imageload2_play.out \
+	  $(OBJDIR)record_imageload2.makefile.copy $(OBJDIR)record_imageload2.record
+
+# Test replay of image load/unload events recorded on Linux
+cross_os_replay.test: $(OBJDIR)record_imageload2$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)record_imageload2$(PINTOOL_SUFFIX) -r -p $(TARGET)_cross_os_replay \
+	  -- $(TESTAPP) makefile $(OBJDIR)cross_os_replay.makefile.copy
+	# The replay output log should be the same as the output when it was recorded
+	$(DIFF) $(TARGET)_cross_os_replay.reference $(TARGET)_cross_os_replay_play.out
+	$(RM) $(TARGET)_cross_os_replay_play.out $(OBJDIR)cross_os_replay.makefile.copy
+
+set_loader_info_shift.test: $(OBJDIR)set_loader_info_shift$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)set_loader_info_shift$(PINTOOL_SUFFIX) -- $(TESTAPP) makefile $(OBJDIR)set_loader_info_shift.makefile.copy
+	$(RM) $(OBJDIR)set_loader_info_shift.makefile.copy
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special applications' build rules ######
+
+$(OBJDIR)win_exception$(EXE_SUFFIX): win_exception.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)call_function_natively_app$(EXE_SUFFIX): call_function_natively_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)

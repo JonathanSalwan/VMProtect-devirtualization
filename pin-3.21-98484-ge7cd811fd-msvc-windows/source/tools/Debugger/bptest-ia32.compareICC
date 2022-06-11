@@ -1,0 +1,6 @@
+Breakpoint 1,.*(in)? foo ()
+Breakpoint 2,.*(in)? foo ()
+Breakpoint 4,.*(in)? sub ()
+Breakpoint 4,.*(in)? sub ()
+Breakpoint 3,.*(in)? foo ()
+(Program exited normally.$|\[Inferior 1 \(Remote target\) exited normally\])

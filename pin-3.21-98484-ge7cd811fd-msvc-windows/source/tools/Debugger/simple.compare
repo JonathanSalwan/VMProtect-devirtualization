@@ -1,0 +1,5 @@
+Breakpoint 1,\s*main.*at\s*simple.c:(12|15)
+Breakpoint 2,\s*main.*at\s*simple.c:17
+.*= 21
+.*= 6
+(Program exited normally.$|\[Inferior 1 \(Remote target\) exited normally\])

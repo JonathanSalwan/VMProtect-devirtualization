@@ -1,0 +1,26 @@
+In watch_rtn, arg: 10 version_reg_value 0
+version base
+In watch_rtn, arg: 10 version_reg_value 10
+version 1
+In watch_rtn, arg: 20 version_reg_value 0
+version base
+In watch_rtn, arg: 20 version_reg_value 20
+version 2
+In watch_rtn, arg: 20 version_reg_value 0
+version base
+In watch_rtn, arg: 20 version_reg_value 20
+version 2
+In watch_rtn, arg: -1 version_reg_value 0
+version base
+In watch_rtn, arg: 10 version_reg_value 0
+version base
+In watch_rtn, arg: 10 version_reg_value 10
+version 1
+In watch_rtn, arg: 10 version_reg_value 0
+version base
+In watch_rtn, arg: 10 version_reg_value 10
+version 1
+In watch_rtn, arg: 20 version_reg_value 0
+version base
+In watch_rtn, arg: 20 version_reg_value 20
+version 2

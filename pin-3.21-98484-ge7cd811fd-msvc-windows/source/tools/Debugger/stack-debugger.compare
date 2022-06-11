@@ -1,0 +1,8 @@
+Breakpoint 1,\s*main.*at.*fibonacci.cpp:15
+Stack tracing enabled.
+Will break when thread reaches new stack usage max.
+Thread 0 uses [0-9]+ bytes of stack.
+Program received signal SIGTRAP, Trace/breakpoint trap.
+Breakpoint 2,
+Current stack usage: [0-9]+ bytes.
+Maximum stack usage: [0-9]+ bytes.

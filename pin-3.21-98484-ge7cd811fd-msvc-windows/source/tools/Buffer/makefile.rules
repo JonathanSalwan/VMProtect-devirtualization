@@ -1,0 +1,152 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := bufferaddr two_buffers allocate mlog_buffer buffer-then buffer-predicate buffererror buffer-lengths \
+                   buffer_invalid_reg buffer_arg
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS :=
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := buffer_arg_app
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS := buffer_arg_app buffer_arg
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Handle exceptions here (OS/arch related) ######
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+bufferaddr.test: $(OBJDIR)bufferaddr$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -xyzzy -mesgon log_buffer -logfile $(OBJDIR)bufferaddr.log -t $(OBJDIR)bufferaddr$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)bufferaddr.out -- $(TESTAPP) makefile $(OBJDIR)bufferaddr.makefile.copy
+	$(QGREP) -e "Allocated buffer" $(OBJDIR)bufferaddr.log
+	$(RM) $(OBJDIR)bufferaddr.log $(OBJDIR)bufferaddr.makefile.copy $(OBJDIR)bufferaddr.out
+
+two_buffers.test: $(OBJDIR)two_buffers$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -xyzzy -mesgon log_buffer -logfile $(OBJDIR)two_buffers.log -t $(OBJDIR)two_buffers$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)two_buffers.out -- $(TESTAPP) makefile $(OBJDIR)two_buffers.makefile.copy
+	$(QGREP) -e "buffer 1" $(OBJDIR)two_buffers.out
+	$(QGREP) -e "buffer 2" $(OBJDIR)two_buffers.out
+	$(RM) $(OBJDIR)two_buffers.log $(OBJDIR)two_buffers.makefile.copy $(OBJDIR)two_buffers.out
+
+allocate.test: $(OBJDIR)allocate$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -xyzzy -mesgon log_buffer -logfile $(OBJDIR)allocate.log \
+	  -t $(OBJDIR)allocate$(PINTOOL_SUFFIX) -o $(OBJDIR)allocate.out -- $(TESTAPP) makefile $(OBJDIR)allocate.makefile.copy
+	$(QGREP) -e "found buffer" $(OBJDIR)allocate.log
+	$(RM) $(OBJDIR)allocate.log $(OBJDIR)allocate.makefile.copy $(OBJDIR)allocate.out
+
+mlog_buffer.test: $(OBJDIR)mlog_buffer$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)mlog_buffer$(PINTOOL_SUFFIX) -o $(OBJDIR)mlog_buffer.tool.out \
+	  -- $(TESTAPP) makefile $(OBJDIR)mlog_buffer.makefile.copy > $(OBJDIR)mlog_buffer.out 2>&1
+	$(CMP) makefile $(OBJDIR)mlog_buffer.makefile.copy
+	$(RM) $(OBJDIR)mlog_buffer.out $(OBJDIR)mlog_buffer.makefile.copy $(OBJDIR)mlog_buffer.tool.out*
+
+buffer-then.test: $(OBJDIR)buffer-then$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)buffer-then$(PINTOOL_SUFFIX) -o $(OBJDIR)buffer-then.out \
+	  -- $(TESTAPP) makefile $(OBJDIR)buffer-then.makefile.copy > $(OBJDIR)buffer-then.out 2>&1
+	$(CMP) makefile $(OBJDIR)buffer-then.makefile.copy
+	$(RM) $(OBJDIR)buffer-then.out $(OBJDIR)buffer-then.makefile.copy $(OBJDIR)buffer-then.out.*
+
+buffer-predicate.test: $(OBJDIR)buffer-predicate$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)buffer-predicate$(PINTOOL_SUFFIX) -o $(OBJDIR)buffer-predicate.out \
+	  -- $(TESTAPP) makefile $(OBJDIR)buffer-predicate.makefile.copy > $(OBJDIR)buffer-predicate.out 2>&1
+	$(CMP) makefile $(OBJDIR)buffer-predicate.makefile.copy
+	$(RM) $(OBJDIR)buffer-predicate.out $(OBJDIR)buffer-predicate.makefile.copy $(OBJDIR)buffer-predicate.out.*
+
+buffer-lengths.test: $(OBJDIR)buffer-lengths$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)buffer-lengths$(PINTOOL_SUFFIX) \
+	  -- $(TESTAPP) makefile $(OBJDIR)buffer-lengths.makefile.copy
+	$(GREP) -e "Test passed" buffer-lengths.out
+	$(RM) buffer-lengths.out $(OBJDIR)buffer-lengths.makefile.copy
+
+# This is a negative test, it should fail.
+buffererror.test: $(OBJDIR)buffererror$(PINTOOL_SUFFIX) $(TESTAPP)
+	-$(PIN) -xyzzy -mesgon log_buffer -logfile $(OBJDIR)buffererror.log -t $(OBJDIR)buffererror$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)buffererror.out -- $(TESTAPP) makefile $(OBJDIR)buffererror.makefile.copy
+	echo "buffererror is a negative test.  Ignore the failure."
+	$(QGREP) "IARG_REG_REFERENCE" $(OBJDIR)buffererror.log
+	$(RM) $(OBJDIR)buffererror.log $(OBJDIR)buffererror.out
+
+buffer_invalid_reg.test: $(OBJDIR)buffer_invalid_reg$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(RM) -f $(OBJDIR)buffer_invalid_reg.makefile.copy $(OBJDIR)buffer_invalid_reg.err
+	! ( $(PIN) -logfile $(OBJDIR)$(@:.test=.pin.log) -error_file $(OBJDIR)buffer_invalid_reg.err -t $(OBJDIR)buffer_invalid_reg$(PINTOOL_SUFFIX) -r pin_ebx \
+	  -- $(TESTAPP) makefile $(OBJDIR)buffer_invalid_reg.makefile.copy )
+	$(QGREP) "Invalid REG for IARG_REG_.* pin_ebx" $(OBJDIR)buffer_invalid_reg.err
+	$(RM) $(OBJDIR)buffer_invalid_reg.err
+	! ( $(PIN) -error_file $(OBJDIR)buffer_invalid_reg.err -t $(OBJDIR)buffer_invalid_reg$(PINTOOL_SUFFIX) -r xmm0 \
+	  -- $(TESTAPP) makefile $(OBJDIR)buffer_invalid_reg.makefile.copy )
+	$(QGREP) "Invalid REG for IARG_REG_.* xmm0" $(OBJDIR)buffer_invalid_reg.err
+	$(PIN) -logfile $(OBJDIR)$(@:.test=.pin.log) -t $(OBJDIR)buffer_invalid_reg$(PINTOOL_SUFFIX) -r cs \
+	  -- $(TESTAPP) makefile $(OBJDIR)buffer_invalid_reg.makefile.copy
+	$(RM) -f $(OBJDIR)buffer_invalid_reg.makefile.copy $(OBJDIR)buffer_invalid_reg.err $(OBJDIR)$(@:.test=.pin.log)
+
+buffer_arg.test: $(OBJDIR)buffer_arg$(PINTOOL_SUFFIX) $(OBJDIR)buffer_arg_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)buffer_arg$(PINTOOL_SUFFIX) -- $(OBJDIR)buffer_arg_app$(EXE_SUFFIX)
+##############################################################
+#
+# Build rules
+#
+##############################################################
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+$(OBJDIR)buffer_arg_app$(EXE_SUFFIX): buffer_arg_app.c $(OBJDIR)buffer_arg_app_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(EXPORT)SimpleCmovTest $(APP_LIBS)

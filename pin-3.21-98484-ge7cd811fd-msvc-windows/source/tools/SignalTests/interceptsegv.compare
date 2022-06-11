@@ -1,0 +1,3 @@
+Thread 0: Tool got signal SIGSEGV at PC 0x[0-9,a-z]*
+Signal is an exception
+Application has a handler for this signal

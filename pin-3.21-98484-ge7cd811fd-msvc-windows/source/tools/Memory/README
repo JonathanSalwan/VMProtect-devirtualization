@@ -1,0 +1,14 @@
+#
+# Copyright (C) 2004-2004 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+allcache - shows all the capabilities of the cache simulator
+           
+dcache - shows all the capabilities of the cache simulator
+         NB: for performance reasons we do not model the icache
+
+dcache_xscale_config - models the cache hierarchy of and ipaq 55xx PDA
+                       cache size, associativity, etc. can be changed via commanline line switches
+                       NB: for performance reasons we do not model the icache
+

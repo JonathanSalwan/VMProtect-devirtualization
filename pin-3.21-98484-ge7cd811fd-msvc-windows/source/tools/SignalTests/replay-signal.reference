@@ -1,0 +1,8 @@
+Notified of real signal, recording
+Got signal SIGUSR1
+Replaying handled signal
+Notified of first replayed signal
+Got signal SIGUSR1
+Replaying fatal signal
+Notified of second replayed signal
+Notified of application exit

@@ -1,0 +1,4 @@
+BeforePinVerifyInTry
+Start handling exception. Exception code = 0xc0000094
+BeforePinVerifyInCatch
+PinFiniFunction

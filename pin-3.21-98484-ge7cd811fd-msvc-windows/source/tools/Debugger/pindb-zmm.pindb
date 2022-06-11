@@ -1,0 +1,8 @@
+b thread exit
+c
+p $k0
+p $ymm0h
+p $zmm0h
+c
+c
+q

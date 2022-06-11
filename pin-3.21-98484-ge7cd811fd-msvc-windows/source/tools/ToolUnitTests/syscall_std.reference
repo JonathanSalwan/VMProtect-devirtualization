@@ -1,0 +1,7 @@
+Before FAST call to NtAllocateVirtualMemory
+NtAllocateVirtualMemory:  size = 777 allocation type = 3000 protect = 4
+Set NtAllocateVirtualMemory system call number
+After FAST call to NtAllocateVirtualMemory
+Before ALT call to NtAllocateVirtualMemory
+NtAllocateVirtualMemory:  size = 777 allocation type = 3000 protect = 4
+After ALT call to NtAllocateVirtualMemory

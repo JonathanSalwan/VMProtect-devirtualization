@@ -1,0 +1,2 @@
+(Thread 1 hit )?Breakpoint 1,\s*Breakpoint.*at\s*action-pending-app.cpp:[59|61]
+(Program exited normally.$|\[Inferior 1 \(Remote target\) exited normally\])

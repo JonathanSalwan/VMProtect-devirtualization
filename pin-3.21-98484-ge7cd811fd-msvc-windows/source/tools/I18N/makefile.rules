@@ -1,0 +1,139 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS :=
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS :=
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS :=
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_ROOTS += $(OS_TYPE)_unicode
+    TOOL_ROOTS += i18n_tool
+    APP_ROOTS += $(OS_TYPE)_unicode_test_launcher $(OS_TYPE)_unicode
+endif
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    TEST_ROOTS += $(OS_TYPE)_unicode
+    TOOL_ROOTS += i18n_tool
+    APP_ROOTS += $(OS_TYPE)_unicode_test_launcher $(OS_TYPE)_unicode
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+unix_unicode.test: $(OBJDIR)$(OS_TYPE)_unicode_test_launcher$(EXE_SUFFIX) $(OBJDIR)i18n_tool$(PINTOOL_SUFFIX) $(OBJDIR)$(OS_TYPE)_unicode$(EXE_SUFFIX)
+	$(RM) -f $(OS_TYPE)_unicode.out i18n_tool.out
+	$(OBJDIR)$(OS_TYPE)_unicode_test_launcher$(EXE_SUFFIX) test $(PIN) \
+	  -t $(OBJDIR)i18n_tool$(PINTOOL_SUFFIX) -uni_param ParamName -- $(OBJDIR)$(OS_TYPE)_unicode$(EXE_SUFFIX)
+	$(DIFF) $(OS_TYPE)_unicode.out $(OS_TYPE)_unicode.reference
+	$(DIFF) i18n_tool.out $(OS_TYPE)_i18n_tool.reference
+	$(RM) $(OS_TYPE)_unicode.out i18n_tool.out
+
+win_unicode.test: $(OBJDIR)$(OS_TYPE)_unicode_test_launcher$(EXE_SUFFIX) $(OBJDIR)i18n_tool$(PINTOOL_SUFFIX) $(OBJDIR)$(OS_TYPE)_unicode$(EXE_SUFFIX)
+	$(RM) -f $(OS_TYPE)_unicode.out i18n_tool.out
+	$(OBJDIR)$(OS_TYPE)_unicode_test_launcher$(EXE_SUFFIX) test $(PINBIN) -p32 $(PIN32) -p64 $(PIN64) \
+	  -t $(OBJDIR)i18n_tool$(PINTOOL_SUFFIX) -uni_param ParamName -- $(OBJDIR)$(OS_TYPE)_unicode$(EXE_SUFFIX)
+	$(DIFF) $(OS_TYPE)_unicode.out $(OS_TYPE)_unicode.reference
+	$(DIFF) i18n_tool.out $(OS_TYPE)_i18n_tool.reference
+	$(RM) $(OS_TYPE)_unicode.out i18n_tool.out
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special applications' build rules ######
+
+# The unix_unicode_test_launcher application changes names to unicode naming. We use it to build
+# the unicode test application in order to test unicode name demangling correctly.
+# The unix_unicode_test_launcher expects the last argument passed to it to be the source filename
+# so we don't add any linker flags to the build command line (they are not necessary anyway).
+$(OBJDIR)unix_unicode$(EXE_SUFFIX): unix_unicode.cpp $(OBJDIR)unix_unicode_test_launcher$(EXE_SUFFIX)
+	$(OBJDIR)unix_unicode_test_launcher$(EXE_SUFFIX) make $(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) \
+	$(COMP_EXE)$@ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS) $<
+
+# The unicode test application on Windows is kept in the source control in binary form because
+# some cygwin/ssh issues prevent us from compiling with /Zi (debug info). So all we need to do
+# is copy the pre-built application (and its corresponding .pdb file) to the proper directory.
+# See the commented out rule below for the actual build rule.
+$(OBJDIR)win_unicode$(EXE_SUFFIX):
+	cp win_unicode_$(TARGET)$(EXE_SUFFIX) $(OBJDIR)win_unicode$(EXE_SUFFIX)
+	cp win_unicode_$(TARGET).pdb $(OBJDIR)win_unicode.pdb
+#
+#$(OBJDIR)win_unicode$(EXE_SUFFIX): win_unicode.cpp $(OBJDIR)win_unicode_test_launcher$(EXE_SUFFIX)
+#	$(OBJDIR)win_unicode_test_launcher$(EXE_SUFFIX) make $(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) \
+#	$(COMP_EXE)$@ $<

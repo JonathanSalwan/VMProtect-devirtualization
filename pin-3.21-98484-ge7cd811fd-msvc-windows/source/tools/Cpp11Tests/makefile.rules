@@ -1,0 +1,113 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := 
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS :=
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := 
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS += cpp11Threads
+    APP_ROOTS += cpp11ThreadsApp
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+# If cpp11 flag is not supported by GCC, no test from this makefile should be run.
+ifeq (,$(findstring $(CPP11FLAGS),$(HELPOUT)))
+    TEST_TOOL_ROOTS := 
+    APP_ROOTS := 
+endif
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+cpp11Threads.test: $(OBJDIR)cpp11Threads$(PINTOOL_SUFFIX) $(OBJDIR)cpp11ThreadsApp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)cpp11Threads$(PINTOOL_SUFFIX) -o $(OBJDIR)cpp11Threads.log \
+	  -- $(OBJDIR)cpp11ThreadsApp$(EXE_SUFFIX) > $(OBJDIR)cpp11ThreadsApp.log
+	$(QGREP) "Number of threads started: 9" $(OBJDIR)cpp11Threads.log
+	$(QGREP) "Number of threads created: 8" $(OBJDIR)cpp11Threads.log
+	$(QGREP) "Number of threads finish: 9" $(OBJDIR)cpp11Threads.log
+	$(RM) $(OBJDIR)cpp11Threads*.log
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special applications' build rules ######
+
+$(OBJDIR)cpp11ThreadsApp$(EXE_SUFFIX): cpp11ThreadsApp.cpp
+	$(APP_CXX) $(CPP11FLAGS) $< $(COMP_EXE)$@ $(CPP11LIBS) $(APP_LIBS)

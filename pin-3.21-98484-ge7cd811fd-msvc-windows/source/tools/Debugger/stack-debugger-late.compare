@@ -1,0 +1,4 @@
+.*in Fibonacci.*at.*fibonacci.cpp:[34|39]
+#0.*in\s*Fibonacci.*at.*fibonacci.cpp:[34|39]
+#1.*in\s*Fibonacci.*at.*fibonacci.cpp:44
+#\d+\s.*in\s*main.*at.*fibonacci.cpp:28

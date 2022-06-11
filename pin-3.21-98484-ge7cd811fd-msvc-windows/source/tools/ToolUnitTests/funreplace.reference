@@ -1,0 +1,45 @@
+Direct calls to addnums()
+itc_callback_push() is called
+Inside replacement_addnums()
+addnums(): n0=0 n1=1 n2=2 n3=3 n4=4 n5=5 n6=6 n7=7 n8=8 n9=9
+result = 45
+itc_callback_push() is called
+Inside replacement_addnums()
+addnums(): n0=100 n1=101 n2=102 n3=103 n4=104 n5=105 n6=106 n7=107 n8=108 n9=109
+result = 1045
+itc_callback_push() is called
+Inside replacement_addnums()
+addnums(): n0=200 n1=201 n2=202 n3=203 n4=204 n5=205 n6=206 n7=207 n8=208 n9=209
+result = 2045
+itc_callback_push() is called
+Inside replacement_addnums()
+addnums(): n0=300 n1=301 n2=302 n3=303 n4=304 n5=305 n6=306 n7=307 n8=308 n9=309
+result = 3045
+itc_callback_push() is called
+Inside replacement_addnums()
+addnums(): n0=400 n1=401 n2=402 n3=403 n4=404 n5=405 n6=406 n7=407 n8=408 n9=409
+result = 4045
+
+Indirect calls to addnums()
+itc_callback_push() is called
+Inside replacement_addnums()
+addnums(): n0=0 n1=1 n2=2 n3=3 n4=4 n5=5 n6=6 n7=7 n8=8 n9=9
+result = 45
+itc_callback_push() is called
+Inside replacement_addnums()
+addnums(): n0=1000 n1=1001 n2=1002 n3=1003 n4=1004 n5=1005 n6=1006 n7=1007 n8=1008 n9=1009
+result = 10045
+itc_callback_push() is called
+Inside replacement_addnums()
+addnums(): n0=2000 n1=2001 n2=2002 n3=2003 n4=2004 n5=2005 n6=2006 n7=2007 n8=2008 n9=2009
+result = 20045
+itc_callback_push() is called
+Inside replacement_addnums()
+addnums(): n0=3000 n1=3001 n2=3002 n3=3003 n4=3004 n5=3005 n6=3006 n7=3007 n8=3008 n9=3009
+result = 30045
+itc_callback_push() is called
+Inside replacement_addnums()
+addnums(): n0=4000 n1=4001 n2=4002 n3=4003 n4=4004 n5=4005 n6=4006 n7=4007 n8=4008 n9=4009
+result = 40045
+
+Done

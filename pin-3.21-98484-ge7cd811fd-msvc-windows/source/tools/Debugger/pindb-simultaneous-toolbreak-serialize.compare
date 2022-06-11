@@ -1,0 +1,19 @@
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+There are 3 pending breakpoints:
+  (?P<id>[0-9]+): Stopping in Worker Thread (?P=id)
+  (?P<id>[0-9]+): Stopping in Worker Thread (?P=id)
+  (?P<id>[0-9]+): Stopping in Worker Thread (?P=id)
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+There are 2 pending breakpoints:
+  (?P<id>[0-9]+): Stopping in Worker Thread (?P=id)
+  (?P<id>[0-9]+): Stopping in Worker Thread (?P=id)
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+There are 1 pending breakpoints:
+  (?P<id>[0-9]+): Stopping in Worker Thread (?P=id)
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+There are 0 pending breakpoints:
+Program exited with 0

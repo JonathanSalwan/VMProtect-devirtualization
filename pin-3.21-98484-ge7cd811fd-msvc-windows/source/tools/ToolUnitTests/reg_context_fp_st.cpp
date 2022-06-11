@@ -1,0 +1,31 @@
+/*
+ * Copyright (C) 2011-2021 Intel Corporation.
+ * SPDX-License-Identifier: MIT
+ */
+
+#include <assert.h>
+#include <stdio.h>
+#include "pin.H"
+
+KNOB< BOOL > KnobUseIargConstContext(KNOB_MODE_WRITEONCE, "pintool", "const_context", "0", "use IARG_CONST_CONTEXT");
+
+ADDRINT globSt0Val;
+
+VOID AnalysisFunc(CONTEXT* context) { globSt0Val = PIN_GetContextReg(context, REG_ST0); }
+
+VOID Instruction(INS ins, VOID* v)
+{
+    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)AnalysisFunc, (KnobUseIargConstContext) ? IARG_CONST_CONTEXT : IARG_CONTEXT,
+                   IARG_END);
+}
+
+int main(int argc, char* argv[])
+{
+    PIN_Init(argc, argv);
+
+    INS_AddInstrumentFunction(Instruction, 0);
+
+    PIN_StartProgram();
+
+    return 0;
+}

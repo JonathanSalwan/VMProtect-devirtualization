@@ -1,0 +1,213 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS :=
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS := lock-integrity lock-stress mutex-integrity mutex-stress mutex-trystress writer-integrity writer-stress \
+              writer-trystress reader-stress reader-trystress rw-integrity rw-stress rw-trystress semaphore trylocks
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS := lock-tester
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := mt-worker
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_ROOTS += rt-locks stress-client-lock
+    TOOL_ROOTS += rt-locks-tool stress-client-lock-tool
+    APP_ROOTS += rt-locks-app stress-client-lock-app
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+# by default LXC does not allow rtprio
+ifeq ($(TARGET_LXC),1) 
+    TEST_ROOTS := $(filter-out rt-locks, $(TEST_ROOTS))
+    APP_ROOTS := $(filter-out rt-locks-app, $(APP_ROOTS))
+    TOOL_ROOTS := $(filter-out rt-locks-tool, $(TOOL_ROOTS))
+endif
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+# See mantis 4622
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(DIST_NAME_FEDORA),1)
+        ifeq ($(DIST_VER_GE_28),1)
+            TEST_ROOTS := $(filter-out rt-locks, $(TEST_ROOTS))
+            APP_ROOTS := $(filter-out rt-locks-app, $(APP_ROOTS))
+            TOOL_ROOTS := $(filter-out rt-locks-tool, $(TOOL_ROOTS))
+        endif
+    endif
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+# Test that PIN_LOCK works when using real-time scheduling on Linux.
+#
+rt-locks.test: $(OBJDIR)rt-locks-app$(EXE_SUFFIX) $(OBJDIR)rt-locks-tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)rt-locks-tool$(PINTOOL_SUFFIX) -- $(OBJDIR)rt-locks-app$(EXE_SUFFIX)
+
+# Stress test for PIN_LOCK to see if two threads can be in the mutex simultaneously.
+#
+lock-integrity.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_LOCK to see if we miss a wakeup and cause a deadlock.
+#
+lock-stress.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_MUTEX to see if two threads can be in the mutex simultaneously.
+#
+mutex-integrity.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_MUTEX to see if we miss a wakeup and cause a deadlock.
+#
+mutex-stress.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_MUTEX when acquiring via "try".
+#
+mutex-trystress.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_RWMUTEX to see if two writer threads can be in the rwmutex simultaneously.
+#
+writer-integrity.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_RWMUTEX to see if we miss a wakeup and cause a deadlock when
+# there are multiple writer threads contending on the lock.
+#
+writer-stress.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_RWMUTEX when acquiring via "try".
+#
+writer-trystress.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_RWMUTEX when readers acquire the lock as fast as possible.
+#
+reader-stress.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_RWMUTEX when there are only readers trying to acquire with "try".
+#
+reader-trystress.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_RWMUTEX to see if a writer can hold the lock simultaneously with a reader.
+#
+rw-integrity.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_RWMUTEX with many readers and writers contending on the lock.
+#
+rw-stress.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_RWMUTEX with many readers and writers trying to acquire the lock via "try".
+#
+rw-trystress.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX)
+
+# Stress test for PIN_SEMAPHORE.
+#
+semaphore.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX) -t 2
+
+# Test the various "try" operations on locks.
+#
+trylocks.test: $(OBJDIR)mt-worker$(EXE_SUFFIX) $(OBJDIR)lock-tester$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)lock-tester$(PINTOOL_SUFFIX) -test $(@:.test=) -- $(OBJDIR)mt-worker$(EXE_SUFFIX) -t 1
+
+# Stress the client lock.
+stress-client-lock.test: $(OBJDIR)stress-client-lock-app$(EXE_SUFFIX) $(OBJDIR)stress-client-lock-tool$(PINTOOL_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)stress-client-lock-tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)stress-client-lock-app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) 2>&1
+	$(CGREP) "started" $(OBJDIR)$(@:.test=.out) | $(QGREP) 50
+	$(CGREP) "finished" $(OBJDIR)$(@:.test=.out) | $(QGREP) 50
+	$(RM) $(OBJDIR)$(@:.test=.out)
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special applications' build rules ######
+
+$(OBJDIR)mt-worker$(EXE_SUFFIX): mt-worker-$(OS_TYPE).cpp
+	$(APP_CXX) $(COMPONENT_INCLUDES) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LPATHS) $(APP_LIBS) $(APP_LIB_ATOMIC) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)rt-locks-app$(EXE_SUFFIX): rt-locks-app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)stress-client-lock-app$(EXE_SUFFIX): stress-client-lock-app.cpp
+	$(APP_CXX) $(COMPONENT_INCLUDES) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LPATHS) $(APP_LIBS) $(APP_LIB_ATOMIC)

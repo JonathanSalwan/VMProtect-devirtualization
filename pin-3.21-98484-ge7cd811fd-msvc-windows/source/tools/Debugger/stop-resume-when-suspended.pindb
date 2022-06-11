@@ -1,0 +1,27 @@
+# Perform 21 step-into debugger commands. After each of this commands
+# Pin analysis routine will be called and will try to stop the application
+# which was already stopped due to VM event
+s
+s 
+s
+s
+s
+s
+s
+s
+s
+s
+s
+s
+s
+s
+s
+s
+s
+s
+s
+s
+# Continue running the application normally
+c
+# Exit the debugger after the program had finished
+q

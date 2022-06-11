@@ -1,0 +1,133 @@
+#
+# Copyright (C) 2012-2021 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := cp-pin hello avx_check avx2_check tsx_check avx512f_check thread_app
+
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS := regvalue_utils supports_avx threadlib avx_check_$(TARGET) supports_avx2 tsx_check_$(TARGET) supports_avx512f \
+                runnable thread_pool sys_memory
+
+ifeq ($(TARGET),intel64)
+    ifneq ($(TARGET_OS),windows)
+        APP_ROOTS += amx_check
+        OBJECT_ROOTS += supports_amx
+    endif
+endif
+
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS := regvallib
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    APP_ROOTS += hello_dwarf4 disable-aslr attachLauncher
+endif
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    OBJECT_ROOTS += set_xmm_scratches_asm
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+ifeq ($(TARGET_OS),linux)
+    DWARF4_SUPPORTED := $(shell $(TOOLS_ROOT)/Utils/testToolVersion $(CXXPATH) lt 4.5)
+    ifeq ($(DWARF4_SUPPORTED),1)
+        APP_ROOTS := $(filter-out hello_dwarf4, $(APP_ROOTS))
+    endif
+endif
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special applications' build rules ######
+
+$(OBJDIR)hello$(EXE_SUFFIX): hello.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< \
+	  $(APP_LDFLAGS_NOOPT) $(DBG_INFO_LD_ALWAYS) $(APP_LIBS)
+
+$(OBJDIR)hello_dwarf4$(EXE_SUFFIX): hello.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< \
+	  $(APP_LDFLAGS_NOOPT) $(DBG_INFO_LD_ALWAYS) $(APP_LIBS) $(DWARF4)
+
+$(OBJDIR)disable-aslr$(EXE_SUFFIX): disable-aslr.c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS)
+
+# The test application should be compiled wihtout any additional libraries,
+# especially libpthread.so (on Linux) so omit the APP_LIBS variable.
+$(OBJDIR)cp-pin$(EXE_SUFFIX): cp-pin.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)avx_check$(EXE_SUFFIX): avx_check.c $(OBJDIR)avx_check_$(TARGET)$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS)
+
+$(OBJDIR)avx2_check$(EXE_SUFFIX): avx2_check.c $(OBJDIR)supports_avx2$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS)
+
+$(OBJDIR)tsx_check$(EXE_SUFFIX): tsx_check.c $(OBJDIR)tsx_check_$(TARGET)$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS)
+
+$(OBJDIR)avx512f_check$(EXE_SUFFIX): avx512f_check.c $(OBJDIR)supports_avx512f$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS)
+
+$(OBJDIR)amx_check$(EXE_SUFFIX): amx_check.c $(OBJDIR)supports_amx$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS)
+
+$(OBJDIR)attachLauncher$(EXE_SUFFIX): attachLauncher_$(OS_TYPE).cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)thread_app$(EXE_SUFFIX): thread_$(OS_TYPE).c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS)
+
+###### Special objects' build rules ######
+
+$(OBJDIR)threadlib$(OBJ_SUFFIX): threadlib_$(OS_TYPE).c threadlib.h
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_OBJ)$@ $<
+  
+$(OBJDIR)runnable$(OBJ_SUFFIX): runnable.cpp runnable.h
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_OBJ)$@ $< $(CXX_LPATHS) $(CXX_LIBS)
+  
+$(OBJDIR)thread_pool$(OBJ_SUFFIX): thread_pool.cpp thread_pool.h threadlib.h
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_OBJ)$@ $< $(CXX_LPATHS) $(CXX_LIBS)
+  
+$(OBJDIR)sys_memory$(OBJ_SUFFIX): sys_memory_$(OS_TYPE).c sys_memory.h
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_OBJ)$@ $< $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)regvalue_utils$(OBJ_SUFFIX): regvalue_utils.h
+
+###### Special libs' build rules ######
+
+$(OBJDIR)regvallib$(LIB_SUFFIX): $(OBJDIR)regvalue_utils$(OBJ_SUFFIX) $(OBJDIR)supports_avx$(OBJ_SUFFIX) $(OBJDIR)supports_avx512f$(OBJ_SUFFIX)
+	$(ARCHIVER)$(OBJDIR)regvallib$(LIB_SUFFIX) $^

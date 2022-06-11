@@ -1,0 +1,54 @@
+#
+# Copyright (C) 2019-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+===============================================
+= PinCRT's freeBSD third party source files =
+===============================================
+
+About
+=====
+This folder contains only a small part of freeBSD third party source code (only headers).
+Some of it was modified.
+URL(git mirror):     https://github.com/freebsd/freebsd/tree/release/12.1.0
+
+This third party header files are being used by Android Bionic (libc).
+Android Bionic itself contains freeBSD source files (as third party code, just as we have third party code in Pin)
+However we currently do not update this component. Therefore is outdated. This started causing us issues in the past.
+Therefore we added freeBSD source files ourselves and did local changes to accommodate it.
+If we'll update Android Bionic with latest version then the current component may be removed.
+
+
+Hierarchy
+===================================
+/          - Our own wrapper files (currently none).
+3rd-party/ -  3rd party code itself. May contain modified and unmodified files
+
+Note
+===================================
+- When making modification to third part source files please add comments inside code itself since annotation history 
+  will be overridden from time to time (by third party code updates). This will help to detect out modifications and 
+  make future third party code updates easier.
+
+
+
+Version
+===================================
+Current 3rd party version: 12.1.0
+When updating to a newer version, update version in Misc/3rd-party-components-README as well.
+
+
+How to update latest 3rd party code
+===================================
+- Download latest version of freeBSD from one of the URL's above.
+- Copy needed sources to this directory (currently only several).
+  This will overwrite some of the files that were previously changed by us (from previous commits)
+- Commit this change as vanilla commit (see examples from previous commits) .
+- Apply all previous commits (with git cherry-pick) which include our changes to the 3rd-party code.
+  If you have more than one commit to apply it is better to squash them together into a single commit to make future
+  3rd-party updates easier.
+- Commit this change with appropriate message
+  Try to include hash numbers of previous commits inside commit message (with summary comment) so one will be able to 
+  locate the reason for the changes we do (see examples from previous commits).
+- Now run sanity, send review and push these 2 commits together. The first commit is meaningless without the second one.

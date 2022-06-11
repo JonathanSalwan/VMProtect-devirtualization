@@ -1,0 +1,1285 @@
+#
+# Copyright (C) 2012-2021 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := probemalloctrace iprtool probesleep replace_empty replacesig_empty scan_all_rtns_for_probe \
+                   probe_on_probe1 probe1 ins_fetch_overrun default_probe_size probe_overlap spawn_internal_thread_probe
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS :=
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := dltest unloadtest sleep replaceapp simplefoo9 simplefoo10 ipr empty error-app little_malloc \
+             exception_in_probed_call_cpp_after_app exception_in_probed_call_cpp_app ins_fetch_overrun_app \
+             func_nops spawn_internal_thread_probe_app
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS := simplebar ins_fetch_overrun_asm func_nops_asm
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS := one two
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS += malloctrace2 symbolnames replace_exit unix_parent_tool proto1 proto2 proto3 proto4 probe2 \
+                       probe3 probe5 probe8 probe10 sectest context_probe malloctrace_locktest init remove_probe probe_err1 \
+                       probe_err2 probe_err4 probe_err5 probe_err6 insert1 insert2 insert3 insert4 insert5 \
+                       insert6 insert7 insert8 insert9 insert10 insert11 insert12 load_map spinlock_replsig \
+                       spinlock_repl spinlock_insert sempost_repl svcraw_repl exit_repl relocate_rtn insert_call_probed \
+                       error-unix-probe error-unix-jit exception_in_dll_tool probesafetest exception_in_probed_call_after \
+                       exception_in_probed_call_sig pthread_exit_tool probe_close exception_in_probe_on_probe \
+                       exception_in_probe_on_probe_sig tpss_lin_libdl tpss_lin_libc \
+                       tpss_lin_libncurses tpss_lin_libpthread tpss_lin_librt atfork_callbacks
+    TEST_ROOTS += insert1_no_xmm follow_execv_with_config1 pthread_atfork pthread_atfork2
+    APP_ROOTS += probesafetest_app replacecall err_call replacefun err_replace bad_jump good_jump fall_thru \
+                 bad_call high_target protofoo simplefoo thd_malloc spin_lock_app sempost_app svcraw_app \
+                 exit_app relocate_app insert_call_probed_app load_map_app exception_in_dll_app pthread_exit_c_app \
+                 pthread_exit_cpp_app dltest-tp child_process parent_process fork_app atfork_callbacks_app
+     OBJECT_ROOTS += probe_safe_test_asm do_nothing_asm simplesp relocate_asm
+    DLL_ROOTS += mallocwrappers exc
+    ifeq ($(TARGET),ia32)
+        TEST_TOOL_ROOTS += signals
+        APP_ROOTS += signals_app
+        LIB_ROOTS += libarglist
+    endif
+    # There is no redzone in the stack according to the IA32 ABI so no need to test it
+    ifeq ($(TARGET),intel64)
+        TEST_TOOL_ROOTS += probe4 probe6 probe7 probe9 syscall_in_probe probe_movip redzone
+        APP_ROOTS += replacedisp replacejmp replaceshorty move_ip syscall_in_probe_app redzone_app
+        OBJECT_ROOTS += jmp_in_probe_asm pc64 syscall_yield64 redzone_app_asm
+    endif
+    ifeq ($(ATTACH),1)
+        TEST_TOOL_ROOTS += exception_in_mt_attach
+        APP_ROOTS += exception_in_mt_attach_app
+    endif
+endif
+
+# macOS*
+ifeq ($(TARGET_OS),mac)
+    TEST_TOOL_ROOTS += malloctrace2 replace_exit symbolnames unix_parent_tool proto1 proto2 proto3 proto4 \
+                       replacesig_empty probe2 probe3 probe5 probe8 probe10 sectest context_probe \
+                       remove_probe probe_err1 probe_err2 probe_err4 probe_err5 probe_err6 insert1 \
+                       insert2 insert3 insert4 insert5 insert6 insert7 insert8 insert9 insert10 insert11 insert12 \
+                       load_map svcraw_repl exit_repl relocate_rtn insert_call_probed insert_call_probed \
+                       probe_close error-unix-probe error-unix-jit exception_in_dll_tool exception_in_probed_call_after \
+                       exception_in_probed_call_sig exception_in_probe_on_probe exception_in_probe_on_probe_sig \
+                       malloctrace_locktest
+    TEST_ROOTS += insert1_no_xmm follow_execv_with_config1 pthread_exit_tool_mac pthread_exit_after_fork \
+                  insert1_parse_image_from_file
+    TOOL_ROOTS += pthread_exit_tool
+    APP_ROOTS += dltest-tp protofoo err_replace replacecall replacefun bad_jump good_jump simplefoo relocate_app \
+                 fall_thru bad_call high_target load_map_appi svcraw_app exit_app insert_call_probed_app \
+                 pthread_exit_cpp_app pthread_exit_c_app load_map_app exception_in_dll_app parent_process \
+                 child_process thd_malloc pthread_exit_after_fork_c_app
+    DLL_ROOTS += mallocwrappers exc
+    OBJECT_ROOTS += do_nothing_asm local_branch_asm simplesp relocate_asm getstack
+    # There is no redzone in the stack according to the IA32 ABI so no need to test it
+    ifeq ($(TARGET),intel64)
+        TEST_TOOL_ROOTS += redzone
+        APP_ROOTS += redzone_app
+        OBJECT_ROOTS := redzone_app_asm
+    endif
+endif
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    TEST_TOOL_ROOTS += proto1win proto3win proto1win-err \
+                       probecdecl tpss insert1win insert2win insert3win insert10 insert11 insert12 \
+                       error-win-probe error-win-jit probe_on_probe2 before_after_defaultcall insertstd \
+                       exception_in_probe exception_in_probe_on_probe exception_in_probed_call exception_in_probe_sig \
+                       exception_in_probe_on_probe_sig exception_in_probed_call_sig exception_in_probed_call_after \
+                       malloctrace2win ssewin shortBB before_after_stdcall deadlock_in_ipc
+    APP_ROOTS += before_after_stdcall_app \
+                 create_process_app heavy_stack_win exception_in_probed_call_after_app shortBBapp exception_in_probe_app \
+                 exception_in_probed_call_app before_after_defaultcall_app win_child_process winstd
+    ifeq ($(TARGET),ia32)
+        TEST_TOOL_ROOTS += probestdcall probefastcall probeheapalloc before_after_fastcall
+        APP_ROOTS +=probestdcall_app probefastcall_app before_after_fastcall_app
+    endif
+    ifeq ($(TARGET),intel64)
+        TEST_TOOL_ROOTS += jmp_in_probe
+        TEST_ROOTS += internal_probes
+        APP_ROOTS += jmp_in_probe_app internal_probes_app
+        OBJECT_ROOTS += jmp_in_probe_asm shortBB64foo
+    endif
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+# See Mantis #4210
+ifeq ($(TARGET_OS),windows)
+    ifeq ($(MSVCVER_GE_15), 1)
+        TEST_TOOL_ROOTS := $(filter-out malloctrace2win, $(TEST_TOOL_ROOTS))
+    endif
+    # This test always fails in Win7 with MSVC14.
+    # Once resolved with MSVC15, try to enable this one too.
+    ifeq ($(VisualStudioVersion),14.0)
+        TEST_TOOL_ROOTS := $(filter-out malloctrace2win, $(TEST_TOOL_ROOTS))
+    endif
+    # See Mantis 4468
+    ifeq ($(ICC),1)
+        TEST_TOOL_ROOTS := $(filter-out exception_in_probed_call_sig exception_in_probe_on_probe_sig \
+                                        exception_in_probe_sig exception_in_probe, $(TEST_TOOL_ROOTS))
+        APP_ROOTS := $(filter-out exception_in_probe_app, $(APP_ROOTS))
+    endif
+endif
+
+# These tests fail on libc 2.26 - see Mantis 4440
+ifeq ($(TARGET_OS),linux)
+    LIBC_VERSION_GE_2_26 := $(shell $(TOOLS_ROOT)/Utils/testLibcVersion ge 2.26)
+    ifeq ($(LIBC_VERSION_GE_2_26),1)
+        TEST_ROOTS := $(filter-out pthread_atfork pthread_atfork2, $(TEST_ROOTS))
+    endif
+endif
+
+# see mantis 4697
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(ICC),1)
+        TEST_TOOL_ROOTS := $(filter-out iprtool , $(TEST_TOOL_ROOTS))
+    endif
+endif
+
+ifeq ($(TARGET_OS),mac)
+    MACOS_VERSION_GE_1015 := $(shell $(TOOLS_ROOT)/Utils/testMacOsVersion ge 10.15.0)
+
+    ifeq ($(MACOS_VERSION_GE_1015), 1)
+        # See mantis 4830
+        TEST_TOOL_ROOTS := $(filter-out malloctrace_locktest, $(TEST_TOOL_ROOTS))
+        TEST_ROOTS := $(filter-out pthread_exit_after_fork, $(TEST_ROOTS))
+    endif
+endif
+
+# Mantis 4885 (Probe mode)
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(DIST_NAME_FEDORA),1)
+        DIST_VER_GE_33 := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion ge 33)
+        ifeq ($(DIST_VER_GE_33),1)
+            TEST_TOOL_ROOTS := $(filter-out svcraw_repl, $(TEST_TOOL_ROOTS))
+            APP_ROOTS := $(filter-out svcraw_app, $(APP_ROOTS))
+        endif
+    endif
+    ifeq ($(DIST_NAME_SLES),1)
+        DIST_VER_GE_15_3 := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion ge 15.3)
+        ifeq ($(DIST_VER_GE_15_3),1)
+            TEST_TOOL_ROOTS := $(filter-out svcraw_repl, $(TEST_TOOL_ROOTS))
+            APP_ROOTS := $(filter-out svcraw_app, $(APP_ROOTS))
+        endif
+    endif
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+ifeq ($(TARGET_OS),mac)
+    MACOS_VERSION_GE_1014 := $(shell $(TOOLS_ROOT)/Utils/testMacOsVersion ge 10.14.0)
+
+    ifeq ($(MACOS_VERSION_GE_1014), 1)
+        # See mantis 4680
+        SANITY_SUBSET := $(filter-out malloctrace_locktest, $(SANITY_SUBSET))
+        # See mantis 4751
+        SANITY_SUBSET := $(filter-out pthread_exit_after_fork, $(SANITY_SUBSET))
+        # See mantis 4825
+        SANITY_SUBSET := $(filter-out pthread_exit_tool_mac, $(SANITY_SUBSET))
+    endif
+endif
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+# Checks that probe is not permitted for very short functs but it is permitted for short funcs followed by nops.
+# Also makes sure that tool can force probe for short func.
+# The second part of this test checks the functionality of the -unrestricted_rtn_size flag.
+probesafetest.test: $(OBJDIR)probesafetest$(PINTOOL_SUFFIX) $(OBJDIR)probesafetest_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)probesafetest$(PINTOOL_SUFFIX) -- $(OBJDIR)probesafetest_app$(EXE_SUFFIX) \
+	  > $(OBJDIR)probesafetest.out 2>&1
+	$(QGREP) "too_short is not safe for probed replacement !!!" $(OBJDIR)probesafetest.out
+	$(QGREP) "too_short_with_nops is safe for probed replacement !!!" $(OBJDIR)probesafetest.out
+	$(QGREP) "too_short successfully replaced!!!" $(OBJDIR)probesafetest.out
+	$(QGREP) "too_short_with_nops successfully replaced!!!" $(OBJDIR)probesafetest.out
+	$(RM) $(OBJDIR)probesafetest.out
+	$(PIN) -t $(OBJDIR)probesafetest$(PINTOOL_SUFFIX) -unrestricted_rtn_size -- $(OBJDIR)probesafetest_app$(EXE_SUFFIX) \
+	  > $(OBJDIR)probesafetest.out 2>&1
+	$(QGREP) "too_short is safe for probed replacement !!!" $(OBJDIR)probesafetest.out
+	$(QGREP) "too_short_with_nops is safe for probed replacement !!!" $(OBJDIR)probesafetest.out
+	$(QGREP) "too_short successfully replaced!!!" $(OBJDIR)probesafetest.out
+	$(QGREP) "too_short_with_nops successfully replaced!!!" $(OBJDIR)probesafetest.out
+	$(RM) $(OBJDIR)probesafetest.out
+
+probe1.test: $(OBJDIR)probe1$(PINTOOL_SUFFIX) $(OBJDIR)replaceapp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)probe1$(PINTOOL_SUFFIX) -o $(OBJDIR)probe1_tool.outfile \
+	  -- $(OBJDIR)replaceapp$(EXE_SUFFIX) > $(OBJDIR)probe1.out 2>&1
+	$(QGREP) "Nothing" $(OBJDIR)probe1_tool.outfile
+	$(RM) $(OBJDIR)probe1_tool.outfile $(OBJDIR)probe1.out
+
+#probe2 is a negative test.
+probe2.test: $(OBJDIR)probe2$(PINTOOL_SUFFIX) $(OBJDIR)err_replace$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)probe2$(PINTOOL_SUFFIX) -o $(OBJDIR)probe2_tool.outfile \
+	  -- $(OBJDIR)err_replace$(EXE_SUFFIX) > $(OBJDIR)probe2.out 2>&1
+	echo "probe2 should fail. Ignore the error."
+	$(RM) $(OBJDIR)probe2_tool.outfile $(OBJDIR)probe2.out
+
+probe3.test: $(OBJDIR)probe3$(PINTOOL_SUFFIX) $(OBJDIR)replacecall$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)probe3$(PINTOOL_SUFFIX) -o $(OBJDIR)probe3_tool.outfile \
+	  -- $(OBJDIR)replacecall$(EXE_SUFFIX) > $(OBJDIR)probe3.out 2>&1
+	$(QGREP) "Nothing" $(OBJDIR)probe3_tool.outfile
+	$(RM) $(OBJDIR)probe3_tool.outfile $(OBJDIR)probe3.out
+
+#probe4 works correctly on ia32 with probe size = 5. negative test on intel64.
+probe4.test: $(OBJDIR)probe4$(PINTOOL_SUFFIX) $(OBJDIR)err_call$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)probe4$(PINTOOL_SUFFIX) -o $(OBJDIR)probe4_tool.outfile \
+	  -xyzzy -mesgon log_probe -logfile $(OBJDIR)probe4_tool.log -- $(OBJDIR)err_call$(EXE_SUFFIX) \
+	    > $(OBJDIR)probe4.out 2>&1
+	echo "probe4 should fail. Ignore the error."
+	$(QGREP) call_function $(OBJDIR)probe4_tool.log
+	$(RM) $(OBJDIR)probe4_tool.log $(OBJDIR)probe4.out $(OBJDIR)probe4_tool.outfile
+
+probe5.test: $(OBJDIR)probe5$(PINTOOL_SUFFIX) $(OBJDIR)replacefun$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)probe5$(PINTOOL_SUFFIX) -o $(OBJDIR)probe5_tool.outfile \
+	  -- $(OBJDIR)replacefun$(EXE_SUFFIX) > $(OBJDIR)probe5.out 2>&1
+	$(QGREP) "Nothing" $(OBJDIR)probe5_tool.outfile
+	$(RM) $(OBJDIR)probe5.out $(OBJDIR)probe5_tool.outfile
+
+probe6.test: $(OBJDIR)probe6$(PINTOOL_SUFFIX) $(OBJDIR)replacedisp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)probe6$(PINTOOL_SUFFIX) -o $(OBJDIR)probe6_tool.outfile \
+	  -- $(OBJDIR)replacedisp$(EXE_SUFFIX) > $(OBJDIR)probe6.out 2>&1
+	$(QGREP) "Doing" $(OBJDIR)probe6_tool.outfile
+	$(RM) $(OBJDIR)probe6.out $(OBJDIR)probe6_tool.outfile
+
+probe7.test: $(OBJDIR)probe7$(PINTOOL_SUFFIX) $(OBJDIR)replacejmp$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)probe7$(PINTOOL_SUFFIX) -o $(OBJDIR)probe7_tool.outfile \
+	  -xyzzy -mesgon log_probe -- $(OBJDIR)replacejmp$(EXE_SUFFIX) > $(OBJDIR)probe7.out 2>&1
+	$(QGREP) "Doing" $(OBJDIR)probe7_tool.outfile
+	$(RM) $(OBJDIR)probe7_tool.outfile $(OBJDIR)probe7.out
+
+#probe8 is a negative test.
+probe8.test: $(OBJDIR)probe8$(PINTOOL_SUFFIX) $(OBJDIR)bad_jump$(EXE_SUFFIX)
+	-$(PIN) -xyzzy -mesgon log_probe -logfile $(OBJDIR)probe8_pin.log \
+	  -t $(OBJDIR)probe8$(PINTOOL_SUFFIX) -o $(OBJDIR)probe8_tool.outfile \
+	  -- $(OBJDIR)bad_jump$(EXE_SUFFIX) > $(OBJDIR)probe8.out 2>&1
+	echo "probe8 should fail. Ignore the error."
+	$(QGREP) unconditional $(OBJDIR)probe8_pin.log
+	$(RM) $(OBJDIR)probe8_pin.log $(OBJDIR)probe8.out $(OBJDIR)probe8_tool.outfile
+
+
+probe9.test: $(OBJDIR)probe9$(PINTOOL_SUFFIX) $(OBJDIR)replaceshorty$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)probe9$(PINTOOL_SUFFIX) -o $(OBJDIR)probe9_tool.outfile -xyzzy -mesgon log_probe \
+	  -- $(OBJDIR)replaceshorty$(EXE_SUFFIX) > $(OBJDIR)probe9.out 2>&1
+	$(QGREP) "Short" $(OBJDIR)probe9_tool.outfile
+	$(RM) $(OBJDIR)probe9_tool.outfile $(OBJDIR)probe9.out
+
+probe10.test: $(OBJDIR)probe10$(PINTOOL_SUFFIX) $(OBJDIR)good_jump$(EXE_SUFFIX)
+	-$(PIN) -xyzzy -mesgon log_probe -logfile $(OBJDIR)probe10_pin.log -t $(OBJDIR)probe10$(PINTOOL_SUFFIX) \
+          -logfile $(OBJDIR)probe10_tool.log \
+	    -- $(OBJDIR)good_jump$(EXE_SUFFIX) > $(OBJDIR)probe10.out 2>&1
+	$(QGREP) "replacement" $(OBJDIR)probe10.out
+	$(RM) $(OBJDIR)probe10_tool.log $(OBJDIR)probe10_pin.log $(OBJDIR)probe10.out
+
+#probe_err1 is a negative test.
+probe_err1.test: $(OBJDIR)probe_err1$(PINTOOL_SUFFIX) $(OBJDIR)bad_jump$(EXE_SUFFIX)
+	-$(PIN) -error_file $(OBJDIR)probe_err1.xml \
+	  -t $(OBJDIR)probe_err1$(PINTOOL_SUFFIX) -logfile $(OBJDIR)probe_err1_tool.log \
+	    -- $(OBJDIR)bad_jump$(EXE_SUFFIX) > $(OBJDIR)probe_err1.out 2>&1
+	echo "probe_err1 should fail. Ignore the error."
+	$(QGREP) "not suitable" $(OBJDIR)probe_err1.xml
+	$(RM) $(OBJDIR)probe_err1.xml $(OBJDIR)probe_err1_tool.log $(OBJDIR)probe_err1.out
+
+#probe_err2 is a negative test.
+probe_err2.test: $(OBJDIR)probe_err2$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX)
+	-$(PIN) -error_file $(OBJDIR)probe_err2.xml \
+	  -t $(OBJDIR)probe_err2$(PINTOOL_SUFFIX) -logfile $(OBJDIR)probe_err2_tool.log \
+	    -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)probe_err2.out 2>&1
+	echo "probe_err2 should fail. Ignore the error."
+	$(QGREP) "not supported" $(OBJDIR)probe_err2.xml
+	$(RM) $(OBJDIR)probe_err2.xml $(OBJDIR)probe_err2_tool.log $(OBJDIR)probe_err2.out
+
+
+#probe_movip test check relocation of procedure with ip-relative mov instruction
+probe_movip.test: $(OBJDIR)probe_movip$(PINTOOL_SUFFIX) $(OBJDIR)move_ip$(EXE_SUFFIX)
+	-$(PIN) -t $(OBJDIR)probe_movip$(PINTOOL_SUFFIX) -logfile $(OBJDIR)probe_movip_tool.log \
+	  -- $(OBJDIR)move_ip$(EXE_SUFFIX) > $(OBJDIR)probe_movip.out 2>&1
+	$(RM) $(OBJDIR)probe_movip_tool.log $(OBJDIR)probe_movip.out
+
+#probe_err4 is a negative test.
+probe_err4.test: $(OBJDIR)probe_err4$(PINTOOL_SUFFIX) $(OBJDIR)fall_thru$(EXE_SUFFIX)
+	-$(PIN) -error_file $(OBJDIR)probe_err4.xml \
+	  -t $(OBJDIR)probe_err4$(PINTOOL_SUFFIX) -logfile $(OBJDIR)probe_err4_tool.log \
+	    -- $(OBJDIR)fall_thru$(EXE_SUFFIX) > $(OBJDIR)probe_err4.out 2>&1
+	echo "probe_err4 should fail. Ignore the error."
+	$(QGREP) "not suitable" $(OBJDIR)probe_err4.xml
+	$(RM) $(OBJDIR)probe_err4.xml $(OBJDIR)probe_err4_tool.log $(OBJDIR)probe_err4.out
+
+#probe_err5 is a negative test.
+probe_err5.test: $(OBJDIR)probe_err5$(PINTOOL_SUFFIX) $(OBJDIR)bad_call$(EXE_SUFFIX)
+	-$(PIN) -error_file $(OBJDIR)probe_err5.xml \
+	  -t $(OBJDIR)probe_err5$(PINTOOL_SUFFIX) -logfile $(OBJDIR)probe_err5_tool.log \
+	    -- $(OBJDIR)bad_call$(EXE_SUFFIX) > $(OBJDIR)probe_err5.out 2>&1
+	echo "probe_err5 should fail. Ignore the error."
+	$(QGREP) "not suitable" $(OBJDIR)probe_err5.xml
+	$(RM) $(OBJDIR)probe_err5.xml $(OBJDIR)probe_err5_tool.log $(OBJDIR)probe_err5.out
+
+
+#probe_err6 is a negative test.
+probe_err6.test: $(OBJDIR)probe_err6$(PINTOOL_SUFFIX) $(OBJDIR)high_target$(EXE_SUFFIX)
+	-$(PIN) -error_file $(OBJDIR)probe_err6.xml \
+	  -t $(OBJDIR)probe_err6$(PINTOOL_SUFFIX) -logfile $(OBJDIR)probe_err6_tool.log \
+	    -- $(OBJDIR)high_target$(EXE_SUFFIX) > $(OBJDIR)probe_err6.out 2>&1
+	echo "probe_err6 should fail. Ignore the error."
+	$(QGREP) "not suitable" $(OBJDIR)probe_err6.xml
+	$(RM) $(OBJDIR)probe_err6.xml $(OBJDIR)probe_err6_tool.log $(OBJDIR)probe_err6.out
+
+
+probe_on_probe1.test: $(OBJDIR)probe_on_probe1$(PINTOOL_SUFFIX) $(OBJDIR)replaceapp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)probe_on_probe1$(PINTOOL_SUFFIX) -o $(OBJDIR)probe_on_probe1_tool.out \
+	  -- $(OBJDIR)replaceapp$(EXE_SUFFIX) > $(OBJDIR)probe_on_probe1.out 2>&1
+	$(DIFF) $(OBJDIR)probe_on_probe1_tool.out probe_on_probe1.reference
+	$(RM) $(OBJDIR)probe_on_probe1_tool.out $(OBJDIR)probe_on_probe1.out
+
+probe_on_probe2.test: $(OBJDIR)probe_on_probe2$(PINTOOL_SUFFIX) $(OBJDIR)create_process_app$(EXE_SUFFIX) $(OBJDIR)win_child_process$(EXE_SUFFIX)
+	$(PIN) -follow_execv -probe -t $(OBJDIR)probe_on_probe2$(PINTOOL_SUFFIX) -o $(OBJDIR)probe_on_probe2_tool.out \
+	  -- $(OBJDIR)create_process_app$(EXE_SUFFIX) > $(OBJDIR)probe_on_probe2.out 2>&1
+	$(QGREP) correct $(OBJDIR)probe_on_probe2.out
+	$(QGREP) "Pin Wrapper works" $(OBJDIR)probe_on_probe2_tool.out
+	$(GREP) "CreateProcess" $(OBJDIR)probe_on_probe2_tool.out | $(QGREP) before
+	$(GREP) "CreateProcess" $(OBJDIR)probe_on_probe2_tool.out | $(QGREP) after
+	$(RM) $(OBJDIR)probe_on_probe2_tool.out $(OBJDIR)probe_on_probe2.out
+
+probemalloctrace.test: $(OBJDIR)probemalloctrace$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)probemalloctrace$(PINTOOL_SUFFIX) -o $(OBJDIR)probemalloctrace_tool.outfile \
+	  -- $(TESTAPP) makefile $(OBJDIR)probemalloctrace.makefile.copy > $(OBJDIR)probemalloctrace.out 2>&1
+	$(DIFF) makefile $(OBJDIR)probemalloctrace.makefile.copy
+	$(QGREP) "Probe" $(OBJDIR)probemalloctrace_tool.outfile
+	$(RM) $(OBJDIR)probemalloctrace_tool.outfile $(OBJDIR)probemalloctrace.makefile.copy $(OBJDIR)probemalloctrace.out
+
+probecdecl.test: $(OBJDIR)probecdecl$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)probecdecl$(PINTOOL_SUFFIX) \
+	  -- $(TESTAPP) makefile $(OBJDIR)probecdecl.makefile.copy > $(OBJDIR)probecdecl.out 2>&1
+	$(DIFF) makefile $(OBJDIR)probecdecl.makefile.copy
+	$(EGREP) "Probe|Replacement not safe" probecdecl.outfile
+	$(RM) $(OBJDIR)probecdecl.makefile.copy $(OBJDIR)probecdecl.out probecdecl.outfile
+
+probeheapalloc.test: $(OBJDIR)probeheapalloc$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)probeheapalloc$(PINTOOL_SUFFIX) \
+	  -- $(TESTAPP) makefile $(OBJDIR)probeheapalloc.makefile.copy > $(OBJDIR)probeheapalloc.out 2>&1
+	$(DIFF) makefile $(OBJDIR)probeheapalloc.makefile.copy
+	$(QGREP) "Probe" probeheapalloc.outfile
+	$(RM) $(OBJDIR)probeheapalloc.makefile.copy $(OBJDIR)probeheapalloc.out probeheapalloc.outfile
+
+probestdcall.test: $(OBJDIR)probestdcall$(PINTOOL_SUFFIX) $(OBJDIR)probestdcall_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)probestdcall$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)probestdcall_app$(EXE_SUFFIX) > $(OBJDIR)probestdcall.out 2>&1
+	$(QGREP) "SUCCESS" $(OBJDIR)probestdcall.out
+	$(RM) $(OBJDIR)probestdcall.out
+	# Enforce debug info garbage collection in symbol server
+	$(PIN) -t $(OBJDIR)probestdcall$(PINTOOL_SUFFIX) -xyzzy -debug_info_max_size 0 \
+	  -- $(OBJDIR)probestdcall_app$(EXE_SUFFIX) > $(OBJDIR)probestdcall.out 2>&1
+	$(QGREP) "SUCCESS" $(OBJDIR)probestdcall.out
+	$(RM) $(OBJDIR)probestdcall.out
+
+before_after_stdcall.test: $(OBJDIR)before_after_stdcall$(PINTOOL_SUFFIX) $(OBJDIR)before_after_stdcall_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)before_after_stdcall$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)before_after_stdcall_app$(EXE_SUFFIX) > $(OBJDIR)before_after_stdcall.out 2>&1
+	$(QGREP) "SUCCESS" $(OBJDIR)before_after_stdcall.out
+	$(RM) $(OBJDIR)before_after_stdcall.out
+
+probefastcall.test: $(OBJDIR)probefastcall$(PINTOOL_SUFFIX) $(OBJDIR)probefastcall_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)probefastcall$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)probefastcall_app$(EXE_SUFFIX) > $(OBJDIR)probefastcall.out 2>&1
+	$(QGREP) "SUCCESS" $(OBJDIR)probefastcall.out
+	$(RM) $(OBJDIR)probefastcall.out
+	# Enforce debug info garbage collection in symbol server
+	$(PIN) -t $(OBJDIR)probefastcall$(PINTOOL_SUFFIX) -xyzzy -debug_info_max_size 0 \
+	  -- $(OBJDIR)probefastcall_app$(EXE_SUFFIX) > $(OBJDIR)probefastcall.out 2>&1
+	$(QGREP) "SUCCESS" $(OBJDIR)probefastcall.out
+	$(RM) $(OBJDIR)probefastcall.out
+
+before_after_fastcall.test: $(OBJDIR)before_after_fastcall$(PINTOOL_SUFFIX) $(OBJDIR)before_after_fastcall_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)before_after_fastcall$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)before_after_fastcall_app$(EXE_SUFFIX) > $(OBJDIR)before_after_fastcall.out 2>&1
+	$(QGREP) "SUCCESS" $(OBJDIR)before_after_fastcall.out
+	$(RM) $(OBJDIR)before_after_fastcall.out
+
+before_after_defaultcall.test: $(OBJDIR)before_after_defaultcall$(PINTOOL_SUFFIX) $(OBJDIR)before_after_defaultcall_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)before_after_defaultcall$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)before_after_defaultcall_app$(EXE_SUFFIX) > $(OBJDIR)before_after_defaultcall.out 2>&1
+	$(QGREP) "SUCCESS" $(OBJDIR)before_after_defaultcall.out
+	$(RM) $(OBJDIR)before_after_defaultcall.out
+
+proto1.test: $(OBJDIR)proto1$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)proto1$(PINTOOL_SUFFIX) -- $(TESTAPP) makefile $(OBJDIR)proto1.makefile.copy \
+	  > $(OBJDIR)proto1.out 2>&1
+	$(DIFF) makefile $(OBJDIR)proto1.makefile.copy
+	$(RM) $(OBJDIR)proto1.out $(OBJDIR)proto1.makefile.copy
+
+proto1win.test: $(OBJDIR)proto1win$(PINTOOL_SUFFIX) $(OBJDIR)dltest$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)two$(DLL_SUFFIX)
+	$(PIN) -t $(OBJDIR)proto1win$(PINTOOL_SUFFIX) -- $(OBJDIR)dltest$(EXE_SUFFIX) > $(OBJDIR)proto1win.out 2>&1
+	$(EGREP) "Probe_Malloc|Replacement not safe" $(OBJDIR)proto1win.out
+	$(RM) $(OBJDIR)proto1win.out
+
+#this is a negative test
+proto1win-err.test: $(OBJDIR)proto1win-err$(PINTOOL_SUFFIX)
+	echo "proto1win-err should fail. Ignore the error."
+	-$(PIN) -t $(OBJDIR)proto1win-err$(PINTOOL_SUFFIX) -- $(OBJDIR)non-existent-test > $(OBJDIR)proto1win-err.out 2>&1
+	$(EGREP) "No such file or directory|The system cannot find the file specified" $(OBJDIR)proto1win-err.out
+	$(RM) $(OBJDIR)proto1win-err.out
+
+proto2.test: $(OBJDIR)proto2$(PINTOOL_SUFFIX) $(OBJDIR)protofoo$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)proto2$(PINTOOL_SUFFIX) -- $(OBJDIR)protofoo$(EXE_SUFFIX) > $(OBJDIR)proto2.out 2>&1
+	$(QGREP) "Original Arguments = ( 11, 22, 33, 44 )" $(OBJDIR)proto2.out
+	$(QGREP) "New Arguments = ( 100, 200, 300, 400, 500 )" $(OBJDIR)proto2.out
+	$(QGREP) "Baz Original Arguments = ( 666 )" $(OBJDIR)proto2.out
+	$(RM) $(OBJDIR)proto2.out
+
+replacesig_empty.test: $(OBJDIR)replacesig_empty$(PINTOOL_SUFFIX) $(OBJDIR)empty$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)replacesig_empty$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)empty$(EXE_SUFFIX) > $(OBJDIR)replacesig_empty.out 2>&1
+	$(QGREP) "33" $(OBJDIR)replacesig_empty.out
+	$(RM) $(OBJDIR)replacesig_empty.out
+
+replace_empty.test: $(OBJDIR)replace_empty$(PINTOOL_SUFFIX) $(OBJDIR)empty$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)replace_empty$(PINTOOL_SUFFIX) -- $(OBJDIR)empty$(EXE_SUFFIX) > $(OBJDIR)replace_empty.out 2>&1
+	$(QGREP) "33" $(OBJDIR)replace_empty.out
+	$(RM) $(OBJDIR)replace_empty.out
+
+replace_empty_twice.test: $(OBJDIR)replace_empty_twice$(PINTOOL_SUFFIX) $(OBJDIR)empty$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)replace_empty_twice$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)empty$(EXE_SUFFIX) > $(OBJDIR)replace_empty_twice.out 2>&1
+	$(QGREP) "33" $(OBJDIR)replace_empty_twice.out
+	$(QGREP) Boo2 $(OBJDIR)replace_empty_twice.out
+	$(QGREP) Boo1 $(OBJDIR)replace_empty_twice.out
+	$(RM) $(OBJDIR)replace_empty_twice.out
+
+proto3.test: $(OBJDIR)proto3$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -probe -t $(OBJDIR)proto3$(PINTOOL_SUFFIX) -- $(TESTAPP) makefile $(OBJDIR)proto3.makefile.copy \
+	  > $(OBJDIR)proto3.out 2>&1
+	$(DIFF) makefile $(OBJDIR)proto3.makefile.copy
+	$(QGREP) "Probe_Malloc" $(OBJDIR)proto3.out
+	$(RM) $(OBJDIR)proto3.out $(OBJDIR)proto3.makefile.copy
+	$(PIN) -t $(OBJDIR)proto3$(PINTOOL_SUFFIX) -- $(TESTAPP) makefile $(OBJDIR)proto3.makefile.copy \
+	  > $(OBJDIR)proto3.out 2>&1
+	$(DIFF) makefile $(OBJDIR)proto3.makefile.copy
+	$(QGREP) "Jit_Malloc" $(OBJDIR)proto3.out
+	$(RM) $(OBJDIR)proto3.out $(OBJDIR)proto3.makefile.copy
+
+proto3win.test: $(OBJDIR)proto3win$(PINTOOL_SUFFIX) $(OBJDIR)dltest$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)two$(DLL_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)proto3win$(PINTOOL_SUFFIX) -- $(OBJDIR)dltest$(EXE_SUFFIX) > $(OBJDIR)proto3win.out 2>&1
+	$(EGREP) "Probe_Malloc|Replacement not safe" $(OBJDIR)proto3win.out
+	$(RM) $(OBJDIR)proto3win.out
+	$(PIN) -t $(OBJDIR)proto3win$(PINTOOL_SUFFIX) -- $(OBJDIR)dltest$(EXE_SUFFIX) > $(OBJDIR)proto3win.out 2>&1
+	$(EGREP) "Jit_Malloc|Replacement not safe" $(OBJDIR)proto3win.out
+	$(RM) $(OBJDIR)proto3win.out
+
+proto4.test: $(OBJDIR)proto4$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)proto4$(PINTOOL_SUFFIX) -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)proto4.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)proto4.out
+	$(RM) $(OBJDIR)proto4.out
+	$(PIN) -t $(OBJDIR)proto4$(PINTOOL_SUFFIX) -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)proto4.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)proto4.out
+	$(RM) $(OBJDIR)proto4.out
+
+insert1.test: $(OBJDIR)insert1$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert1$(PINTOOL_SUFFIX) -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)insert1.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)insert1.out
+	$(RM) $(OBJDIR)insert1.out
+
+# Testing -prefer_parse_macho_from_mem 0 with this chosen test
+insert1_parse_image_from_file.test: $(OBJDIR)insert1$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert1$(PINTOOL_SUFFIX) -prefer_parse_macho_from_mem 0 -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)insert1_parse_image_from_file.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)insert1_parse_image_from_file.out
+	$(RM) $(OBJDIR)insert1_parse_image_from_file.out
+
+insert1_no_xmm.test: $(OBJDIR)insert1$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX)
+	$(PIN) -probe -xyzzy -mesgon log_final -logfile $(OBJDIR)insert1_no_xmm.log -bridge_save_fp 0 -bridge_save_x87 0 \
+	  -t $(OBJDIR)insert1$(PINTOOL_SUFFIX) -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)insert1_no_xmm.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)insert1_no_xmm.out
+	$(BASHTEST) `$(CGREP) xmm $(OBJDIR)insert1_no_xmm.log` -eq "0"
+	$(RM) $(OBJDIR)insert1_no_xmm.log $(OBJDIR)insert1_no_xmm.out
+
+insert2.test: $(OBJDIR)insert2$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert2$(PINTOOL_SUFFIX) -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)insert2.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)insert2.out
+	$(QGREP) "Before 3" $(OBJDIR)insert2.out
+	$(RM) $(OBJDIR)insert2.out
+
+insert3.test: $(OBJDIR)insert3$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert3$(PINTOOL_SUFFIX) -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)insert3.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)insert3.out
+	$(QGREP) "Before_MyMalloc" $(OBJDIR)insert3.out
+	$(QGREP) "Before_MyFree" $(OBJDIR)insert3.out
+	$(RM) $(OBJDIR)insert3.out
+
+insert4.test: $(OBJDIR)insert4$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert4$(PINTOOL_SUFFIX) -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)insert4.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)insert4.out
+	$(QGREP) "Before_Malloc" $(OBJDIR)insert4.out
+	$(QGREP) "Before_Free" $(OBJDIR)insert4.out
+	$(RM) $(OBJDIR)insert4.out
+
+insert5.test: $(OBJDIR)insert5$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert5$(PINTOOL_SUFFIX) -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)insert5.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)insert5.out
+	$(QGREP) "Before_Malloc" $(OBJDIR)insert5.out
+	$(QGREP) "After_Malloc" $(OBJDIR)insert5.out
+	$(RM) $(OBJDIR)insert5.out
+
+insert6.test: $(OBJDIR)insert6$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert6$(PINTOOL_SUFFIX) -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)insert6.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)insert6.out
+	$(QGREP) "Before_Malloc" $(OBJDIR)insert6.out
+	$(QGREP) "After_Malloc" $(OBJDIR)insert6.out
+	$(RM) $(OBJDIR)insert6.out
+
+insert7.test: $(OBJDIR)insert7$(PINTOOL_SUFFIX) $(OBJDIR)protofoo$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert7$(PINTOOL_SUFFIX) -- $(OBJDIR)protofoo$(EXE_SUFFIX) > $(OBJDIR)insert7.out 2>&1
+	$(QGREP) "345" $(OBJDIR)insert7.out
+	$(QGREP) "Before" $(OBJDIR)insert7.out
+	$(QGREP) "After" $(OBJDIR)insert7.out
+	$(RM) $(OBJDIR)insert7.out
+
+insert8.test: $(OBJDIR)insert8$(PINTOOL_SUFFIX) $(OBJDIR)simplefoo10$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert8$(PINTOOL_SUFFIX) -- $(OBJDIR)simplefoo10$(EXE_SUFFIX) > $(OBJDIR)insert8.out 2>&1
+	$(QGREP) "one = 1" $(OBJDIR)insert8.out
+	$(QGREP) "Before: original arguments = ( 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 )" $(OBJDIR)insert8.out
+	$(QGREP) "After: return value = 45" $(OBJDIR)insert8.out
+	$(QGREP) "main: total = 45" $(OBJDIR)insert8.out
+	$(RM) $(OBJDIR)insert8.out
+
+insert9.test: $(OBJDIR)insert9$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert9$(PINTOOL_SUFFIX) -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)insert9.out 2>&1
+	$(QGREP) "passed" $(OBJDIR)insert9.out
+	$(QGREP) "After_Malloc" $(OBJDIR)insert9.out
+	$(RM) $(OBJDIR)insert9.out
+
+insert10.test: $(OBJDIR)insert10$(PINTOOL_SUFFIX) $(OBJDIR)simplefoo10$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert10$(PINTOOL_SUFFIX) -- $(OBJDIR)simplefoo10$(EXE_SUFFIX) > $(OBJDIR)insert10.out 2>&1
+	$(QGREP) "After: return value = 45" $(OBJDIR)insert10.out
+	$(QGREP) "main: total = 45" $(OBJDIR)insert10.out
+	$(RM) $(OBJDIR)insert10.out
+
+insert11.test: $(OBJDIR)insert11$(PINTOOL_SUFFIX) $(OBJDIR)simplefoo9$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert11$(PINTOOL_SUFFIX) -- $(OBJDIR)simplefoo9$(EXE_SUFFIX) > $(OBJDIR)insert11.out 2>&1
+	$(QGREP) "one = 1" $(OBJDIR)insert11.out
+	$(QGREP) "Before: original arguments = ( 1, 2, 3, 4, 5, 6, 7, 8, 9 )" $(OBJDIR)insert11.out
+	$(QGREP) "After: return value = 45" $(OBJDIR)insert11.out
+	$(QGREP) "main: total = 45" $(OBJDIR)insert11.out
+	$(RM) $(OBJDIR)insert11.out
+
+insert12.test: $(OBJDIR)insert12$(PINTOOL_SUFFIX) $(OBJDIR)simplefoo9$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insert12$(PINTOOL_SUFFIX) -- $(OBJDIR)simplefoo9$(EXE_SUFFIX) > $(OBJDIR)insert12.out 2>&1
+	$(RM) $(OBJDIR)insert12.out
+
+insertstd.test: $(OBJDIR)insertstd$(PINTOOL_SUFFIX) $(OBJDIR)winstd$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)insertstd$(PINTOOL_SUFFIX) -- $(OBJDIR)winstd$(EXE_SUFFIX) > $(OBJDIR)insertstd.out 2>&1
+	$(QGREP) "one = 1" $(OBJDIR)insertstd.out
+	$(QGREP) "Before: arguments = ( 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 )" $(OBJDIR)insertstd.out
+	$(QGREP) "After: return value = 45" $(OBJDIR)insertstd.out
+	$(RM) $(OBJDIR)insertstd.out
+
+insert1win.test: $(OBJDIR)insert1win$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)insert1win$(PINTOOL_SUFFIX) \
+	  -- $(TESTAPP) makefile $(OBJDIR)insert1win.makefile.copy > $(OBJDIR)insert1win.out
+	$(DIFF) makefile $(OBJDIR)insert1win.makefile.copy
+	$(QGREP) "Before" $(OBJDIR)insert1win.out
+	$(RM) $(OBJDIR)insert1win.out $(OBJDIR)insert1win.makefile.copy
+
+insert2win.test: $(OBJDIR)insert2win$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)insert2win$(PINTOOL_SUFFIX) \
+	  -- $(TESTAPP) makefile $(OBJDIR)insert2win.makefile.copy > $(OBJDIR)insert2win.out
+	$(DIFF) makefile $(OBJDIR)insert2win.makefile.copy
+	$(QGREP) "Before 3" $(OBJDIR)insert2win.out
+	$(RM) $(OBJDIR)insert2win.out $(OBJDIR)insert2win.makefile.copy
+
+insert3win.test: $(OBJDIR)insert3win$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)insert3win$(PINTOOL_SUFFIX) \
+	  -- $(TESTAPP) makefile $(OBJDIR)insert3win.makefile.copy > $(OBJDIR)insert3win.out
+	$(DIFF) makefile $(OBJDIR)insert3win.makefile.copy
+	$(QGREP) "Before_RtlAllocateHeap" $(OBJDIR)insert3win.out
+	$(RM) $(OBJDIR)insert3win.out $(OBJDIR)insert3win.makefile.copy
+
+iprtool.test: $(OBJDIR)iprtool$(PINTOOL_SUFFIX) $(OBJDIR)ipr$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)iprtool$(PINTOOL_SUFFIX) -- $(OBJDIR)ipr$(EXE_SUFFIX) > $(OBJDIR)iprtool.out 2>&1
+	$(QGREP) "a = 1" $(OBJDIR)iprtool.out
+	$(RM) $(OBJDIR)iprtool.out
+
+probesleep.test: $(OBJDIR)probesleep$(PINTOOL_SUFFIX) $(OBJDIR)sleep$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)probesleep$(PINTOOL_SUFFIX) -- $(OBJDIR)sleep$(EXE_SUFFIX) > $(OBJDIR)probesleep.out 2>&1
+	$(QGREP) "SleepProbe" $(OBJDIR)probesleep.out
+	$(RM) $(OBJDIR)probesleep.out
+
+ssewin.test: $(OBJDIR)ssewin$(PINTOOL_SUFFIX) $(OBJDIR)heavy_stack_win$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)ssewin$(PINTOOL_SUFFIX) -- $(OBJDIR)heavy_stack_win$(EXE_SUFFIX) > $(OBJDIR)ssewin.out 2>&1
+	$(RM) $(OBJDIR)ssewin.out
+	$(PIN) -t $(OBJDIR)ssewin$(PINTOOL_SUFFIX) -- $(OBJDIR)heavy_stack_win$(EXE_SUFFIX) > $(OBJDIR)ssewin.out 2>&1
+	$(RM) $(OBJDIR)ssewin.out
+
+malloctrace2win.test: $(OBJDIR)malloctrace2win$(PINTOOL_SUFFIX) $(OBJDIR)dltest$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)two$(DLL_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)malloctrace2win$(PINTOOL_SUFFIX) -o $(OBJDIR)malloctrace2.outfile \
+	  -- $(OBJDIR)dltest$(EXE_SUFFIX) > $(OBJDIR)malloctrace2win.out 2>&1
+	$(QGREP) free $(OBJDIR)malloctrace2win.out
+	$(RM) $(OBJDIR)malloctrace2win.out $(OBJDIR)malloctrace2.outfile
+	$(PIN) -t $(OBJDIR)malloctrace2win$(PINTOOL_SUFFIX) -o $(OBJDIR)malloctrace2.outfile \
+	  -- $(OBJDIR)dltest$(EXE_SUFFIX) > $(OBJDIR)malloctrace2win.out 2>&1
+	$(QGREP) malloc $(OBJDIR)malloctrace2win.out
+	$(RM) $(OBJDIR)malloctrace2win.out $(OBJDIR)malloctrace2.outfile
+
+malloctrace2.test: $(OBJDIR)malloctrace2$(PINTOOL_SUFFIX) $(OBJDIR)dltest$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)mallocwrappers$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)two$(DLL_SUFFIX)
+	$(SET_DLL_PATH) $(PIN) -t $(OBJDIR)malloctrace2$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)dltest$(EXE_SUFFIX) > $(OBJDIR)malloctrace2.out 2>&1
+	$(QGREP) Allocated $(OBJDIR)malloctrace2.out
+	$(RM) $(OBJDIR)malloctrace2.out
+
+symbolnames.test: $(OBJDIR)symbolnames$(PINTOOL_SUFFIX) $(OBJDIR)dltest$(EXE_SUFFIX) $(OBJDIR)dltest-tp$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)two$(DLL_SUFFIX)
+	$(SET_DLL_PATH) $(PIN) -t $(OBJDIR)symbolnames$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)dltest$(EXE_SUFFIX) > $(OBJDIR)symbolnames.out
+	$(QGREP) one $(OBJDIR)symbolnames.out
+	$(QGREP) two $(OBJDIR)symbolnames.out
+	$(RM) $(OBJDIR)symbolnames.out
+	$(SET_DLL_PATH) $(PIN) -t $(OBJDIR)symbolnames$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)dltest-tp$(EXE_SUFFIX) > $(OBJDIR)symbolnames.out
+	$(QGREP) one $(OBJDIR)symbolnames.out
+	$(QGREP) two $(OBJDIR)symbolnames.out
+	$(RM) $(OBJDIR)symbolnames.out
+
+context_probe.test: $(OBJDIR)context_probe$(PINTOOL_SUFFIX) $(OBJDIR)simplefoo$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)context_probe$(PINTOOL_SUFFIX) -- $(OBJDIR)simplefoo$(EXE_SUFFIX) > $(OBJDIR)context_probe.out 2>&1
+	$(QGREP) "Blue" $(OBJDIR)context_probe.out
+	$(QGREP) -v "Bar" $(OBJDIR)context_probe.out
+	$(RM) $(OBJDIR)context_probe.out
+
+malloctrace_locktest.test: $(OBJDIR)malloctrace_locktest$(PINTOOL_SUFFIX) $(OBJDIR)thd_malloc$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)malloctrace_locktest$(PINTOOL_SUFFIX) -o $(OBJDIR)malloctrace_locktest.out \
+	  -- $(OBJDIR)thd_malloc$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)malloctrace_locktest.out
+
+init.test: $(OBJDIR)init$(PINTOOL_SUFFIX) $(OBJDIR)thd_malloc$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)init$(PINTOOL_SUFFIX) -- $(OBJDIR)thd_malloc$(EXE_SUFFIX) > $(OBJDIR)init.outfile 2>&1
+	$(QGREP) "libc initialized" $(OBJDIR)init.outfile
+	$(QGREP) "libpthread initialized" $(OBJDIR)init.outfile
+	$(RM) $(OBJDIR)init.outfile
+
+replace_exit.test: $(OBJDIR)replace_exit$(PINTOOL_SUFFIX) $(OBJDIR)little_malloc$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)replace_exit$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)little_malloc$(EXE_SUFFIX) > $(OBJDIR)replace_exit.out 2>&1
+	$(QGREP) "my_exit" $(OBJDIR)replace_exit.out
+	$(RM) $(OBJDIR)replace_exit.out
+
+shortBB.test: $(OBJDIR)shortBB$(PINTOOL_SUFFIX) $(OBJDIR)shortBBapp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)shortBB$(PINTOOL_SUFFIX) -- $(OBJDIR)shortBBapp$(EXE_SUFFIX) > $(OBJDIR)shortBB.out 2>&1
+	$(QGREP) "7" $(OBJDIR)shortBB.out
+	$(RM) $(OBJDIR)shortBB.out
+
+remove_probe.test: $(OBJDIR)remove_probe$(PINTOOL_SUFFIX) $(OBJDIR)unloadtest$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)two$(DLL_SUFFIX)
+	$(SET_DLL_PATH) $(PIN) -xyzzy -mesgon log_probe -logfile $(OBJDIR)remove_probe_pin.log \
+	  -t $(OBJDIR)remove_probe$(PINTOOL_SUFFIX) -logfile $(OBJDIR)remove_probe_tool.log \
+	    -- $(OBJDIR)unloadtest$(EXE_SUFFIX) > $(OBJDIR)remove_probe.out 2>&1
+	$(QGREP) Removing $(OBJDIR)remove_probe_pin.log
+	$(RM) $(OBJDIR)remove_probe_pin.log $(OBJDIR)remove_probe_tool.log $(OBJDIR)remove_probe.out
+
+tpss.test: $(OBJDIR)tpss$(PINTOOL_SUFFIX) $(OBJDIR)dltest$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)two$(DLL_SUFFIX)
+	$(PIN) -t $(OBJDIR)tpss$(PINTOOL_SUFFIX) -- $(OBJDIR)dltest$(EXE_SUFFIX) > $(OBJDIR)tpss.out 2>&1
+	$(RM) $(OBJDIR)tpss.out
+
+spinlock_replsig.test: $(OBJDIR)spinlock_replsig$(PINTOOL_SUFFIX) $(OBJDIR)spin_lock_app$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)spinlock_replsig$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)spin_lock_app$(EXE_SUFFIX) > $(OBJDIR)spinlock_replsig.out 2>&1
+	$(QGREP) SpinLock $(OBJDIR)spinlock_replsig.out
+	$(QGREP) released $(OBJDIR)spinlock_replsig.out
+	$(RM) $(OBJDIR)spinlock_replsig.out
+
+spinlock_repl.test: $(OBJDIR)spinlock_repl$(PINTOOL_SUFFIX) $(OBJDIR)spin_lock_app$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)spinlock_repl$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)spin_lock_app$(EXE_SUFFIX) > $(OBJDIR)spinlock_repl.out 2>&1
+	$(QGREP) SpinLock $(OBJDIR)spinlock_repl.out
+	$(QGREP) released $(OBJDIR)spinlock_repl.out
+	$(RM) $(OBJDIR)spinlock_repl.out
+
+jmp_in_probe.test: $(OBJDIR)jmp_in_probe$(PINTOOL_SUFFIX) $(OBJDIR)jmp_in_probe_app$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)jmp_in_probe$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)jmp_in_probe_app$(EXE_SUFFIX) > $(OBJDIR)jmp_in_probe.out 2>&1
+	$(RM) $(OBJDIR)jmp_in_probe.out
+
+internal_probes.test: $(OBJDIR)internal_probes_app$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)internal_probes_app$(EXE_SUFFIX) > $(OBJDIR)internal_probes.out 2>&1
+	$(RM) $(OBJDIR)internal_probes.out
+
+spinlock_insert.test: $(OBJDIR)spinlock_insert$(PINTOOL_SUFFIX) $(OBJDIR)spin_lock_app$(EXE_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)spinlock_insert$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)spin_lock_app$(EXE_SUFFIX) > $(OBJDIR)spinlock_insert.out 2>&1
+	$(QGREP) After $(OBJDIR)spinlock_insert.out
+	$(QGREP) released $(OBJDIR)spinlock_insert.out
+	$(RM) $(OBJDIR)spinlock_insert.out
+
+sempost_repl.test: $(OBJDIR)sempost_repl$(PINTOOL_SUFFIX) $(OBJDIR)sempost_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)sempost_repl$(PINTOOL_SUFFIX) -- $(OBJDIR)sempost_app$(EXE_SUFFIX)
+
+svcraw_repl.test: $(OBJDIR)svcraw_repl$(PINTOOL_SUFFIX) $(OBJDIR)svcraw_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)svcraw_repl$(PINTOOL_SUFFIX) -- $(OBJDIR)svcraw_app$(EXE_SUFFIX)
+
+exit_repl.test: $(OBJDIR)exit_repl$(PINTOOL_SUFFIX) $(OBJDIR)exit_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exit_repl$(PINTOOL_SUFFIX) -- $(OBJDIR)exit_app$(EXE_SUFFIX)
+
+relocate_rtn.test: $(OBJDIR)relocate_rtn$(PINTOOL_SUFFIX) $(OBJDIR)relocate_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)relocate_rtn$(PINTOOL_SUFFIX) -- $(OBJDIR)relocate_app$(EXE_SUFFIX)
+
+exception_in_probe.test: $(OBJDIR)exception_in_probe$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_probe_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exception_in_probe$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probe_app$(EXE_SUFFIX) > $(OBJDIR)exception_in_probe.out 2>&1
+	$(BASHTEST) `$(CGREP) "Exception C0000005" $(OBJDIR)exception_in_probe.out` -eq "2"
+	$(BASHTEST) `$(CGREP) "Stack-Overflow in RtlLeaveCriticalSection replacement routine" $(OBJDIR)exception_in_probe.out` -eq "2"
+	$(RM) $(OBJDIR)exception_in_probe.out
+
+exception_in_probed_call.test: $(OBJDIR)exception_in_probed_call$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_probed_call_app$(EXE_SUFFIX) $(OBJDIR)exception_in_probed_call_cpp_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exception_in_probed_call$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probed_call_app$(EXE_SUFFIX) > $(OBJDIR)exception_in_probed_call.out 2>&1
+	$(QGREP) "Exception C0000005" $(OBJDIR)exception_in_probed_call.out
+	$(RM) $(OBJDIR)exception_in_probed_call.out
+	$(PIN) -t $(OBJDIR)exception_in_probed_call$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probed_call_cpp_app$(EXE_SUFFIX) > $(OBJDIR)exception_in_probed_call_cpp.out 2>&1
+	$(QGREP) "Exception" $(OBJDIR)exception_in_probed_call_cpp.out
+	$(RM) $(OBJDIR)exception_in_probed_call_cpp.out
+
+exception_in_probe_sig.test: $(OBJDIR)exception_in_probe_sig$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_probe_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exception_in_probe_sig$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probe_app$(EXE_SUFFIX) > $(OBJDIR)exception_in_probe_sig.out 2>&1
+	$(BASHTEST) `$(CGREP) "Exception C0000005" $(OBJDIR)exception_in_probe_sig.out` -eq "2"
+	$(RM) $(OBJDIR)exception_in_probe_sig.out
+
+ifeq ($(TARGET_OS),windows)
+exception_in_probed_call_sig.test: $(OBJDIR)exception_in_probed_call_sig$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_probed_call_app$(EXE_SUFFIX) $(OBJDIR)exception_in_probed_call_cpp_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exception_in_probed_call_sig$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probed_call_app$(EXE_SUFFIX) > $(OBJDIR)exception_in_probed_call_sig.out 2>&1
+	$(QGREP) "Exception C0000005" $(OBJDIR)exception_in_probed_call_sig.out
+	$(RM) $(OBJDIR)exception_in_probed_call_sig.out
+	$(PIN) -t $(OBJDIR)exception_in_probed_call_sig$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probed_call_cpp_app$(EXE_SUFFIX) > $(OBJDIR)exception_in_probed_call_cpp_sig.out 2>&1
+	$(QGREP) "Exception" $(OBJDIR)exception_in_probed_call_cpp_sig.out
+	$(RM) $(OBJDIR)exception_in_probed_call_cpp_sig.out
+
+exception_in_probed_call_after.test: $(OBJDIR)exception_in_probed_call_after$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_probed_call_after_app$(EXE_SUFFIX) $(OBJDIR)exception_in_probed_call_cpp_after_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exception_in_probed_call_after$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probed_call_after_app$(EXE_SUFFIX) > $(OBJDIR)exception_in_probed_call_after.out 2>&1
+	$(QGREP) "Exception C0000005" $(OBJDIR)exception_in_probed_call_after.out
+	$(BASHTEST) `$(CGREP) "result=28" $(OBJDIR)exception_in_probed_call_after.out` -eq "3"
+	$(RM) $(OBJDIR)exception_in_probed_call_after.out
+	$(PIN) -t $(OBJDIR)exception_in_probed_call_after$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probed_call_cpp_after_app$(EXE_SUFFIX) \
+	    > $(OBJDIR)exception_in_probed_call_cpp_after.out 2>&1
+	$(QGREP) "Exception" $(OBJDIR)exception_in_probed_call_cpp_after.out
+	$(BASHTEST) `$(CGREP) "result=28" $(OBJDIR)exception_in_probed_call_cpp_after.out` -eq "3"
+	$(RM) $(OBJDIR)exception_in_probed_call_cpp_after.out
+
+exception_in_probe_on_probe.test: $(OBJDIR)exception_in_probe_on_probe$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_probed_call_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exception_in_probe_on_probe$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probed_call_app$(EXE_SUFFIX) > $(OBJDIR)$(@:test=out) 2>&1
+	$(QGREP) "Exception C0000005" $(OBJDIR)$(@:test=out)
+	$(RM) $(OBJDIR)$(@:test=out)
+
+exception_in_probe_on_probe_cpp.test: $(OBJDIR)exception_in_probe_on_probe$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_probed_call_cpp_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exception_in_probe_on_probe$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probed_call_cpp_app$(EXE_SUFFIX) > $(OBJDIR)$(@:test=out) 2>&1
+	$(QGREP) "Exception" $(OBJDIR)$(@:test=out)
+	$(RM) $(OBJDIR)$(@:test=out)
+
+exception_in_probe_on_probe_sig.test: $(OBJDIR)exception_in_probe_on_probe_sig$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_probed_call_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exception_in_probe_on_probe_sig$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probed_call_app$(EXE_SUFFIX) > $(OBJDIR)exception_in_probe_on_probe_sig.out 2>&1
+	$(QGREP) "Exception C0000005" $(OBJDIR)exception_in_probe_on_probe_sig.out
+	$(RM) $(OBJDIR)exception_in_probe_on_probe_sig.out
+else # ifeq ($(TARGET_OS),windows)
+exception_in_probed_call_sig.test: $(OBJDIR)exception_in_probed_call_sig$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_probed_call_cpp_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exception_in_probed_call_sig$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probed_call_cpp_app$(EXE_SUFFIX) > $(OBJDIR)exception_in_probed_call_sig.out 2>&1
+	$(QGREP) "Exception" $(OBJDIR)exception_in_probed_call_sig.out
+	$(RM) $(OBJDIR)exception_in_probed_call_sig.out
+
+exception_in_probed_call_after.test: $(OBJDIR)exception_in_probed_call_after$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_probed_call_cpp_after_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exception_in_probed_call_after$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probed_call_cpp_after_app$(EXE_SUFFIX) > $(OBJDIR)exception_in_probed_call_after.out 2>&1
+	$(QGREP) "Exception" $(OBJDIR)exception_in_probed_call_after.out
+	$(QGREP) "result=28" $(OBJDIR)exception_in_probed_call_after.out
+	$(RM) $(OBJDIR)exception_in_probed_call_after.out
+
+exception_in_probe_on_probe_sig.test: $(OBJDIR)exception_in_probe_on_probe_sig$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_probed_call_cpp_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exception_in_probe_on_probe_sig$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_probed_call_cpp_app$(EXE_SUFFIX) > $(OBJDIR)exception_in_probe_on_probe_sig.out 2>&1
+	$(QGREP) "Exception" $(OBJDIR)exception_in_probe_on_probe_sig.out
+	$(RM) $(OBJDIR)exception_in_probe_on_probe_sig.out
+endif # else of ifeq ($(TARGET_OS),windows)
+
+exception_in_mt_attach.test: $(OBJDIR)exception_in_mt_attach$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_mt_attach_app$(EXE_SUFFIX)
+	$(OBJDIR)exception_in_mt_attach_app$(EXE_SUFFIX) -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)exception_in_mt_attach$(PINTOOL_SUFFIX) > $(OBJDIR)exception_in_mt_attach.out 2>& 1
+	$(QGREP) "Exception" $(OBJDIR)exception_in_mt_attach.out
+	$(RM) $(OBJDIR)exception_in_mt_attach.out
+
+pthread_exit_tool.test: $(OBJDIR)pthread_exit_tool$(PINTOOL_SUFFIX) $(OBJDIR)pthread_exit_c_app$(EXE_SUFFIX) $(OBJDIR)pthread_exit_cpp_app$(EXE_SUFFIX)
+	$(PIN) -xyzzy -mesgon log_unwind -logfile $(OBJDIR)pthread_exit_c_pin.log \
+	  -t $(OBJDIR)pthread_exit_tool$(PINTOOL_SUFFIX) -xyzzy -mesgon log_unwind -logfile $(OBJDIR)pthread_exit_c_tool.log \
+	    -- $(OBJDIR)pthread_exit_c_app$(EXE_SUFFIX)
+	$(QGREP) "Unwinding frame at ip" $(OBJDIR)pthread_exit_c_pin.log
+	$(RM) $(OBJDIR)/pthread_exit_c_pin.log
+	$(RM) -f $(OBJDIR)pthread_exit_c_tool.log # this file might not be generated so we use the -f flag
+	$(PIN) -xyzzy -mesgon log_unwind -logfile $(OBJDIR)pthread_exit_cpp_pin.log \
+	  -t $(OBJDIR)pthread_exit_tool$(PINTOOL_SUFFIX) -xyzzy -mesgon log_unwind \
+	  -logfile $(OBJDIR)pthread_exit_cpp_tool.log \
+	    -- $(OBJDIR)pthread_exit_cpp_app$(EXE_SUFFIX)
+	$(QGREP) "Unwinding frame at ip" $(OBJDIR)pthread_exit_cpp_pin.log
+	$(RM) $(OBJDIR)/pthread_exit_cpp_pin.log
+	$(RM) -f $(OBJDIR)pthread_exit_cpp_tool.log # this file might not be generated so we use the -f flag
+
+# Equivilent to the test pthread_exit_tool for macOS*
+# The only different between the tests is that it doesn't check that pthread_exit() unwound the stack.
+# The feature of stack unwinding on thread exit is not implemented in macOS*.
+pthread_exit_tool_mac.test: $(OBJDIR)pthread_exit_tool$(PINTOOL_SUFFIX) $(OBJDIR)pthread_exit_c_app$(EXE_SUFFIX) $(OBJDIR)pthread_exit_cpp_app$(EXE_SUFFIX)
+	$(PIN) -xyzzy -mesgon log_unwind -logfile $(OBJDIR)pthread_exit_c_pin.log \
+	  -t $(OBJDIR)pthread_exit_tool$(PINTOOL_SUFFIX) -xyzzy -mesgon log_unwind -logfile $(OBJDIR)pthread_exit_c_tool.log \
+	    -- $(OBJDIR)pthread_exit_c_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)/pthread_exit_c_pin.log
+	$(RM) -f $(OBJDIR)pthread_exit_c_tool.log # this file might not be generated so we use the -f flag
+	$(PIN) -xyzzy -mesgon log_unwind -logfile $(OBJDIR)pthread_exit_cpp_pin.log \
+	  -t $(OBJDIR)pthread_exit_tool$(PINTOOL_SUFFIX) -xyzzy -mesgon log_unwind \
+	  -logfile $(OBJDIR)pthread_exit_cpp_tool.log \
+	    -- $(OBJDIR)pthread_exit_cpp_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)/pthread_exit_cpp_pin.log
+	$(RM) -f $(OBJDIR)pthread_exit_cpp_tool.log # this file might not be generated so we use the -f flag
+
+pthread_exit_after_fork.test: $(OBJDIR)pthread_exit_tool$(PINTOOL_SUFFIX) $(OBJDIR)pthread_exit_after_fork_c_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)pthread_exit_tool$(PINTOOL_SUFFIX) -- $(OBJDIR)pthread_exit_after_fork_c_app$(EXE_SUFFIX)
+
+exception_in_dll_tool.test: $(OBJDIR)exception_in_dll_tool$(PINTOOL_SUFFIX) $(OBJDIR)exception_in_dll_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)exception_in_dll_tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)exception_in_dll_app$(EXE_SUFFIX) > $(OBJDIR)exception_in_dll_tool.out 2>&1
+	$(QGREP) "Try-catch works correctly" $(OBJDIR)exception_in_dll_tool.out
+	$(RM) $(OBJDIR)exception_in_dll_tool.out
+
+signals.test: $(OBJDIR)signals$(PINTOOL_SUFFIX) $(OBJDIR)signals_app$(EXE_SUFFIX)
+	$(PIN) -follow_execv -t $(OBJDIR)signals$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)signals_app$(EXE_SUFFIX) > $(OBJDIR)signals.out 2>&1
+	$(OBJDIR)signals_app$(EXE_SUFFIX) > $(OBJDIR)signals_expected.out 2>&1
+	$(CMP) $(OBJDIR)signals.out $(OBJDIR)signals_expected.out
+	$(RM) $(OBJDIR)signals.out $(OBJDIR)signals_expected.out
+
+syscall_in_probe.test: $(OBJDIR)syscall_in_probe$(PINTOOL_SUFFIX) $(OBJDIR)syscall_in_probe_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)syscall_in_probe$(PINTOOL_SUFFIX) -- $(OBJDIR)syscall_in_probe_app$(EXE_SUFFIX)
+
+load_map.test: $(OBJDIR)load_map$(PINTOOL_SUFFIX) $(OBJDIR)load_map_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)load_map$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)load_map_app$(EXE_SUFFIX) > $(OBJDIR)load_map.out 2>&1
+	$(QGREP) "2 routines were instrumented" $(OBJDIR)load_map.out
+	$(RM) $(OBJDIR)load_map.out
+
+error-unix-jit.test: $(OBJDIR)error-unix-jit$(PINTOOL_SUFFIX) $(OBJDIR)error-app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)error-unix-jit$(PINTOOL_SUFFIX) -- $(OBJDIR)error-app$(EXE_SUFFIX) > $(OBJDIR)error-unix-jit.out 2>&1
+	$(QGREP) "Tool: errno=2" $(OBJDIR)error-unix-jit.out
+	$(RM) $(OBJDIR)error-unix-jit.out
+
+error-unix-probe.test: $(OBJDIR)error-unix-probe$(PINTOOL_SUFFIX) $(OBJDIR)error-app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)error-unix-probe$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)error-app$(EXE_SUFFIX) > $(OBJDIR)error-unix-probe.out 2>&1
+	$(QGREP) "Tool: errno=2" $(OBJDIR)error-unix-probe.out
+	$(RM) $(OBJDIR)error-unix-probe.out
+
+error-win-jit.test: $(OBJDIR)error-win-jit$(PINTOOL_SUFFIX) $(OBJDIR)error-app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)error-win-jit$(PINTOOL_SUFFIX) -- $(OBJDIR)error-app$(EXE_SUFFIX) > $(OBJDIR)error-win-jit.out 2>&1
+	$(QGREP) "Tool: error code=2" $(OBJDIR)error-win-jit.out
+	$(RM) $(OBJDIR)error-win-jit.out
+
+error-win-probe.test: $(OBJDIR)error-win-probe$(PINTOOL_SUFFIX) $(OBJDIR)error-app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)error-win-probe$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)error-app$(EXE_SUFFIX) > $(OBJDIR)error-win-probe.out 2>&1
+	$(QGREP) "Tool: error code=2" $(OBJDIR)error-win-probe.out
+	$(RM) $(OBJDIR)error-win-probe.out
+
+insert_call_probed.test: $(OBJDIR)insert_call_probed$(PINTOOL_SUFFIX) $(OBJDIR)insert_call_probed_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)insert_call_probed$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)insert_call_probed_app$(EXE_SUFFIX) > $(OBJDIR)insert_call_probed.out
+	$(GREP) -i Notification $(OBJDIR)insert_call_probed.out > $(OBJDIR)insert_call_probed.res.out
+	$(CMP) $(OBJDIR)insert_call_probed.res.out insert_call_probed.reference
+	$(RM) $(OBJDIR)insert_call_probed.out $(OBJDIR)insert_call_probed.res.out
+
+follow_execv_with_config1.test: $(OBJDIR)unix_parent_tool$(PINTOOL_SUFFIX) $(OBJDIR)parent_process$(EXE_SUFFIX) $(OBJDIR)child_process$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.tool.out) $(OBJDIR)$(@:.test=.app.out)
+	$(PIN) -follow_execv 1 -t $(OBJDIR)unix_parent_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)$(@:.test=.tool.out) -xyzzy -app child_process_xxx \
+	    -- $(OBJDIR)parent_process$(EXE_SUFFIX) $(OBJDIR)child_process$(EXE_SUFFIX) "param1 param2" param3 \
+	      > $(OBJDIR)$(@:.test=.app.out)
+	## child_process_xxx is not equal to child_process, do not run child under Pin at all
+	$(QGREP) "Do not run Pin under the child process" $(OBJDIR)$(@:.test=.tool.out)
+	$(QGREP) -E "Inserting probe for execve at|Unsafe to probe execve" $(OBJDIR)$(@:.test=.tool.out)
+	$(QGREP) -E "myexecve called|Unsafe to probe execve" $(OBJDIR)$(@:.test=.tool.out)
+	## unix_parent_tool should appear 1 time in the output since it was used in parent only
+	$(BASHTEST) `$(CGREP) "In unix_parent_tool PinTool" $(OBJDIR)$(@:.test=.tool.out)` -eq "1"
+	$(RM) $(OBJDIR)$(@:.test=.tool.out) $(OBJDIR)$(@:.test=.app.out)
+
+tpss_lin_libncurses.test: $(OBJDIR)tpss_lin_libncurses$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)tpss_lin_libncurses$(PINTOOL_SUFFIX) -o $(OBJDIR)tpss_lin_libncurses.txt \
+	-- $(TESTAPP) makefile $(OBJDIR)tpss_lin_libncurses.makefile.copy > $(OBJDIR)tpss_lin_libncurses.out 2>&1
+	$(DIFF) makefile $(OBJDIR)tpss_lin_libncurses.makefile.copy
+	rm $(OBJDIR)tpss_lin_libncurses.out $(OBJDIR)tpss_lin_libncurses.makefile.copy $(OBJDIR)tpss_lin_libncurses.txt
+
+tpss_lin_librt.test: $(OBJDIR)tpss_lin_librt$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)tpss_lin_librt$(PINTOOL_SUFFIX) -o $(OBJDIR)tpss_lin_librt.txt \
+	-- $(TESTAPP) makefile $(OBJDIR)tpss_lin_librt.makefile.copy > $(OBJDIR)tpss_lin_librt.out 2>&1
+	$(DIFF) makefile $(OBJDIR)tpss_lin_librt.makefile.copy
+	rm $(OBJDIR)tpss_lin_librt.out $(OBJDIR)tpss_lin_librt.makefile.copy $(OBJDIR)tpss_lin_librt.txt
+
+tpss_lin_libdl.test: $(OBJDIR)tpss_lin_libdl$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)tpss_lin_libdl$(PINTOOL_SUFFIX) -o $(OBJDIR)tpss_lin_libdl.txt \
+	-- $(TESTAPP) makefile $(OBJDIR)tpss_lin_libdl.makefile.copy > $(OBJDIR)tpss_lin_libdl.out 2>&1
+	$(DIFF) makefile $(OBJDIR)tpss_lin_libdl.makefile.copy
+	rm $(OBJDIR)tpss_lin_libdl.out $(OBJDIR)tpss_lin_libdl.makefile.copy $(OBJDIR)tpss_lin_libdl.txt
+
+tpss_lin_libpthread.test: $(OBJDIR)tpss_lin_libpthread$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)tpss_lin_libpthread$(PINTOOL_SUFFIX) -o $(OBJDIR)tpss_lin_libpthread.txt \
+	-- $(TESTAPP) makefile $(OBJDIR)tpss_lin_libpthread.makefile.copy > $(OBJDIR)tpss_lin_libpthread.out 2>&1
+	$(DIFF) makefile $(OBJDIR)tpss_lin_libpthread.makefile.copy
+	rm $(OBJDIR)tpss_lin_libpthread.out $(OBJDIR)tpss_lin_libpthread.makefile.copy $(OBJDIR)tpss_lin_libpthread.txt
+
+tpss_lin_libc.test: $(OBJDIR)tpss_lin_libc$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)tpss_lin_libc$(PINTOOL_SUFFIX) -o $(OBJDIR)tpss_lin_libc.txt \
+	-- $(TESTAPP) makefile $(OBJDIR)tpss_lin_libc.makefile.copy > $(OBJDIR)tpss_lin_libc.out 2>&1
+	$(DIFF) makefile $(OBJDIR)tpss_lin_libc.makefile.copy
+	rm $(OBJDIR)tpss_lin_libc.out $(OBJDIR)tpss_lin_libc.makefile.copy $(OBJDIR)tpss_lin_libc.txt
+
+pthread_atfork.test: $(OBJDIR)tpss_lin_libc$(PINTOOL_SUFFIX) $(OBJDIR)fork_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)tpss_lin_libc$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:.test=_tpss_libc.txt) \
+    -- $(OBJDIR)fork_app$(EXE_SUFFIX) $(@:.test=_father.log) $(@:.test=_child.log) > $(OBJDIR)$(@:.test=_tpss_libc.out)
+	rm $(OBJDIR)$(@:.test=_tpss_libc.out) $(OBJDIR)$(@:.test=_tpss_libc.txt) $(@:.test=_father.log) $(@:.test=_child.log)
+
+pthread_atfork2.test: $(OBJDIR)tpss_lin_libc$(PINTOOL_SUFFIX) $(OBJDIR)fork_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)tpss_lin_libc$(PINTOOL_SUFFIX) -xyzzy -probe-fork-at-routine-granularity -o $(OBJDIR)$(@:.test=_tpss_libc.txt) \
+	-- $(OBJDIR)fork_app$(EXE_SUFFIX) $(@:.test=_father.log) $(@:.test=_child.log) > $(OBJDIR)$(@:.test=_tpss_libc.out)
+	## Verify no assertion was triggered
+	! ( $(QGREP) "^A: " $(OBJDIR)$(@:.test=_tpss_libc.out) )
+	rm $(OBJDIR)$(@:.test=_tpss_libc.out) $(OBJDIR)$(@:.test=_tpss_libc.txt) $(@:.test=_father.log) $(@:.test=_child.log)
+
+ins_fetch_overrun.test: $(OBJDIR)ins_fetch_overrun$(PINTOOL_SUFFIX) $(OBJDIR)ins_fetch_overrun_app$(EXE_SUFFIX)
+	$(PIN) -xyzzy -logfile $(OBJDIR)$(@:.test=.log) -mesgon log_fetch_rtn_ins \
+	  -t $< -o $(OBJDIR)$(@:.test=.out) -xyzzy -mesgon log_fetch_rtn_ins -- $(OBJDIR)ins_fetch_overrun_app$(EXE_SUFFIX)
+	rm $(OBJDIR)$(@:.test=.log) $(OBJDIR)$(@:.test=.out)
+
+redzone.test: $(OBJDIR)redzone$(PINTOOL_SUFFIX) $(OBJDIR)redzone_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)redzone$(PINTOOL_SUFFIX) -- $(OBJDIR)redzone_app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) 2>&1
+	$(QGREP) "In InsideCheckRedZone_Replacement" $(OBJDIR)$(@:.test=.out)
+	$(RM) $(OBJDIR)$(@:.test=.out)
+
+atfork_callbacks.test: $(OBJDIR)atfork_callbacks$(PINTOOL_SUFFIX) $(OBJDIR)atfork_callbacks_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)atfork_callbacks$(PINTOOL_SUFFIX) -- $(OBJDIR)atfork_callbacks_app$(EXE_SUFFIX)
+
+default_probe_size.test: $(OBJDIR)default_probe_size$(PINTOOL_SUFFIX) $(OBJDIR)func_nops$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)default_probe_size$(PINTOOL_SUFFIX) -- $(OBJDIR)func_nops$(EXE_SUFFIX)
+
+probe_overlap.test: $(OBJDIR)probe_overlap$(PINTOOL_SUFFIX) $(OBJDIR)func_nops$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)probe_overlap$(PINTOOL_SUFFIX) -- $(OBJDIR)func_nops$(EXE_SUFFIX)
+
+spawn_internal_thread_probe.test: $(OBJDIR)spawn_internal_thread_probe$(PINTOOL_SUFFIX) $(OBJDIR)spawn_internal_thread_probe_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)spawn_internal_thread_probe$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)spawn_internal_thread_probe_app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) 2>&1
+	$(QGREP) "in IntThread going to finish thread gracefully." $(OBJDIR)$(@:.test=.out)
+	$(QGREP) "Tool's thread finished successfully." $(OBJDIR)$(@:.test=.out)
+	$(RM) $(OBJDIR)$(@:.test=.out)
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special tools' build rules ######
+
+$(OBJDIR)unix_parent_tool$(PINTOOL_SUFFIX): $(OBJDIR)unix_parent_tool$(OBJ_SUFFIX) $(OBJDIR)libarglist$(LIB_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)tpss_lin_libc$(PINTOOL_SUFFIX): $(OBJDIR)tpss_lin_libc$(OBJ_SUFFIX) $(OBJDIR)tpss_lin_libc_tool$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)tpss_lin_libpthread$(PINTOOL_SUFFIX): $(OBJDIR)tpss_lin_libpthread$(OBJ_SUFFIX) $(OBJDIR)tpss_lin_libpthread_tool$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)tpss_lin_librt$(PINTOOL_SUFFIX): $(OBJDIR)tpss_lin_librt$(OBJ_SUFFIX) $(OBJDIR)tpss_lin_librt_tool$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+###### Special applications' build rules ######
+
+$(OBJDIR)probesafetest_app$(EXE_SUFFIX): probesafetest_app.c $(OBJDIR)probe_safe_test_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+	$(STRIP) --discard-all $@
+
+ifeq ($(TARGET_OS),windows)
+$(OBJDIR)replaceapp$(EXE_SUFFIX): replaceapp.c $(OBJDIR)do_nothing_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) /def:replaceapp.def $(APP_LIBS)
+else
+$(OBJDIR)replaceapp$(EXE_SUFFIX): replaceapp.c $(OBJDIR)do_nothing_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+endif
+
+$(OBJDIR)replacecall$(EXE_SUFFIX): replacecall.c $(OBJDIR)do_nothing_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)replacefun$(EXE_SUFFIX): replacefun.c $(OBJDIR)do_nothing_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)replacejmp$(EXE_SUFFIX): replacejmp.c $(OBJDIR)pc64$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)replaceshorty$(EXE_SUFFIX): replaceshorty.c $(OBJDIR)do_nothing_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)replacedisp$(EXE_SUFFIX): replacedisp.c $(OBJDIR)pc64$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)bad_jump$(EXE_SUFFIX): bad_jump.c $(OBJDIR)local_branch_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)good_jump$(EXE_SUFFIX): good_jump.c $(OBJDIR)local_branch_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)err_replace$(EXE_SUFFIX): err_replace.c $(OBJDIR)local_branch_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)err_call$(EXE_SUFFIX): err_call.c $(OBJDIR)local_branch_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)fall_thru$(EXE_SUFFIX): fall_thru.c $(OBJDIR)local_branch_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)move_ip$(EXE_SUFFIX): move_ip.c $(OBJDIR)local_branch_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)bad_call$(EXE_SUFFIX): bad_call.c $(OBJDIR)local_branch_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)high_target$(EXE_SUFFIX): high_target.c $(OBJDIR)local_branch_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)protofoo$(EXE_SUFFIX): protofoo.c protobar.c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)simplefoo10$(EXE_SUFFIX): simplefoo10.c $(OBJDIR)simplebar$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)winstd$(EXE_SUFFIX): simplestd10.c $(OBJDIR)simplebar$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)simplefoo9$(EXE_SUFFIX): simplefoo9.c $(OBJDIR)simplebar$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)empty$(EXE_SUFFIX): empty.c emptysub.c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)spawn_internal_thread_probe_app$(EXE_SUFFIX): spawn_internal_thread_probe_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)load_map_app$(EXE_SUFFIX): load_map_app.cpp $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+# The ia32 version of shortBBapp is built with the default rule.
+ifeq ($(TARGET),intel64)
+$(OBJDIR)shortBBapp$(EXE_SUFFIX): shortBB64app.c $(OBJDIR)shortBB64foo$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+endif
+
+# The $(APP_LIBS) is intentionally omitted here since dl-test should be compiled without
+# -lpthread on Unix platforms.
+$(OBJDIR)dltest$(EXE_SUFFIX): dltest_$(OS_TYPE).c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_DL_LIB)
+
+# This is the version which is compiled with -lpthread.
+$(OBJDIR)dltest-tp$(EXE_SUFFIX): dltest_$(OS_TYPE).c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)unloadtest$(EXE_SUFFIX): unloadtest_$(OS_TYPE).c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)simplefoo$(EXE_SUFFIX): simplefoo.c $(OBJDIR)simplebar$(OBJ_SUFFIX) $(OBJDIR)simplesp$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)little_malloc$(EXE_SUFFIX): little_malloc.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)exception_in_probed_call_app$(EXE_SUFFIX): exception_in_probed_call_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)exception_in_probed_call_after_app$(EXE_SUFFIX): exception_in_probed_call_after_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)exception_in_probed_call_cpp_app$(EXE_SUFFIX): exception_in_probed_call_cpp_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)exception_in_probed_call_cpp_after_app$(EXE_SUFFIX): exception_in_probed_call_cpp_after_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)syscall_in_probe_app$(EXE_SUFFIX): syscall_in_probe_app.c $(OBJDIR)syscall_yield64$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)relocate_app$(EXE_SUFFIX): relocate_app.cpp $(OBJDIR)relocate_asm$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)error-app$(EXE_SUFFIX): error-main.c error-sub.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)pthread_exit_c_app$(EXE_SUFFIX): pthread_exit_app.c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)pthread_exit_after_fork_c_app$(EXE_SUFFIX): pthread_exit_after_fork_app.c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)pthread_exit_cpp_app$(EXE_SUFFIX): pthread_exit_app.c
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)exception_in_mt_attach_app$(EXE_SUFFIX): exception_in_mt_attach_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)exception_in_dll_app$(EXE_SUFFIX): exception_in_dll_app.cpp $(OBJDIR)getstack$(OBJ_SUFFIX) $(OBJDIR)$(DLL_PREFIX)exc$(DLL_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)jmp_in_probe_app$(EXE_SUFFIX): jmp_in_probe_app.cpp jmp_in_probe_app1.cpp $(OBJDIR)jmp_in_probe_asm$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)internal_probes_app$(EXE_SUFFIX): empty.c emptysub.c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) /LARGEADDRESSAWARE:NO $(APP_LIBS)
+
+$(OBJDIR)insert_call_probed_app$(EXE_SUFFIX): insert_call_probed_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)sleep$(EXE_SUFFIX): sleep_$(OS_TYPE).c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)ins_fetch_overrun_app$(EXE_SUFFIX): ins_fetch_overrun_app.c $(OBJDIR)ins_fetch_overrun_app_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(PIE) $(PIC) $(APP_LIBS) $(EXPORT)foo $(EXPORT)bar
+
+# The following test applications on Windows are kept in the source control in binary form because
+# some cygwin/ssh issues prevent us from compiling with /Zi (debug info). So all we need to do
+# is copy the pre-built application (and its corresponding .pdb file) to the proper directory.
+# The original build rule depended on $(OBJDIR)getesp_asm$(OBJ_SUFFIX).
+$(OBJDIR)probestdcall_app$(EXE_SUFFIX):
+	cp probestdcall_app$(EXE_SUFFIX) $(OBJDIR)probestdcall_app$(EXE_SUFFIX)
+	cp probestdcall_app$(DBG_SUFFIX) $(OBJDIR)probestdcall_app$(DBG_SUFFIX)
+
+$(OBJDIR)before_after_stdcall_app$(EXE_SUFFIX):
+	cp before_after_stdcall_app_$(TARGET)$(EXE_SUFFIX) $(OBJDIR)before_after_stdcall_app$(EXE_SUFFIX)
+	cp before_after_stdcall_app_$(TARGET)$(DBG_SUFFIX) $(OBJDIR)before_after_stdcall_app$(DBG_SUFFIX)
+
+$(OBJDIR)probefastcall_app$(EXE_SUFFIX):
+	cp probefastcall_app$(EXE_SUFFIX) $(OBJDIR)probefastcall_app$(EXE_SUFFIX)
+	cp probefastcall_app$(DBG_SUFFIX) $(OBJDIR)probefastcall_app$(DBG_SUFFIX)
+
+$(OBJDIR)before_after_defaultcall_app$(EXE_SUFFIX):
+	cp before_after_defaultcall_app_$(TARGET)$(EXE_SUFFIX) $(OBJDIR)before_after_defaultcall_app$(EXE_SUFFIX)
+	cp before_after_defaultcall_app_$(TARGET)$(DBG_SUFFIX) $(OBJDIR)before_after_defaultcall_app$(DBG_SUFFIX)
+
+$(OBJDIR)before_after_fastcall_app$(EXE_SUFFIX):
+	cp before_after_fastcall_app_$(TARGET)$(EXE_SUFFIX) $(OBJDIR)before_after_fastcall_app$(EXE_SUFFIX)
+	cp before_after_fastcall_app_$(TARGET)$(DBG_SUFFIX) $(OBJDIR)before_after_fastcall_app$(DBG_SUFFIX)
+
+$(OBJDIR)redzone_app$(EXE_SUFFIX): redzone_app.c $(OBJDIR)redzone_app_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)func_nops$(EXE_SUFFIX): func_nops.c $(OBJDIR)func_nops_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)svcraw_app$(EXE_SUFFIX): svcraw_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(RPC_INCLUDES) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS) $(RPC_LIBS)
+
+###### Special objects' build rules ######
+
+$(OBJDIR)unix_parent_tool$(OBJ_SUFFIX): unix_parent_tool.cpp arglist.h
+	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+# This object file may be used later on to build dlls, so it needs to be compiled with the DLL_CXXFLAGS.
+$(OBJDIR)arglist$(OBJ_SUFFIX): arglist.cpp arglist.h
+	$(CXX) $(TOOL_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)tpss_lin_libc$(OBJ_SUFFIX): tpss_lin_libc.c
+	$(APP_CC) $(APP_CXXFLAGS) $(RPC_INCLUDES) $(DLL_CXXFLAGS) $(RPC_LIBS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)tpss_lin_libpthread$(OBJ_SUFFIX): tpss_lin_libpthread.c
+	$(APP_CC) $(APP_CXXFLAGS) $(RPC_INCLUDES) $(DLL_CXXFLAGS) $(RPC_LIBS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)tpss_lin_librt$(OBJ_SUFFIX): tpss_lin_librt.c
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)tpss_lin_libc_tool$(OBJ_SUFFIX): tpss_lin_libc_tool.cpp
+	$(CXX) $(TOOL_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)tpss_lin_libpthread_tool$(OBJ_SUFFIX): tpss_lin_libpthread_tool.cpp
+	$(CXX) $(TOOL_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)tpss_lin_librt_tool$(OBJ_SUFFIX): tpss_lin_librt_tool.cpp
+	$(CXX) $(TOOL_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)simplebar$(OBJ_SUFFIX): simplebar.c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+###### Special dlls' build rules ######
+
+$(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX): one_$(OS_TYPE).c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(DLL_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)$(DLL_PREFIX)two$(DLL_SUFFIX): two_$(OS_TYPE).c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(DLL_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)$(DLL_PREFIX)mallocwrappers$(DLL_SUFFIX): mallocwrappers_$(OS_TYPE).c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(DLL_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)$(DLL_PREFIX)exc$(DLL_SUFFIX): exc.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)
+
+###### Special libs' build rules ######
+
+$(OBJDIR)libarglist$(LIB_SUFFIX): $(OBJDIR)arglist$(OBJ_SUFFIX)
+	$(ARCHIVER)$(OBJDIR)libarglist$(LIB_SUFFIX) $<

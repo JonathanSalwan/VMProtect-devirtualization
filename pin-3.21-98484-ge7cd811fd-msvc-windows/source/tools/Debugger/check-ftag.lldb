@@ -1,0 +1,21 @@
+b main
+c
+b DoFnstenv
+b FldzFunc
+b FstpFunc
+b FldInfFunc
+
+c
+register read ftag
+c
+register read ftag
+c
+register read ftag
+c
+register read ftag
+c
+register read ftag
+c
+register read ftag
+br delete
+c

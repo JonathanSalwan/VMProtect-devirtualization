@@ -1,0 +1,4 @@
+Thread .* stopped at .* \(received event first chance <exception 0xc0000094>\)
+Thread .* stopped at .* \(after step\)
+Thread .* stopped at .* \(received event last chance <exception 0xc0000094>\)
+Program exited with 0

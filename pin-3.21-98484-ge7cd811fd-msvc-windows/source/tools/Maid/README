@@ -1,0 +1,65 @@
+#
+# Copyright (C) 2004-2016 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+MAID - Memory Address Information Dumper
+--
+
+MAID is an ISA-independent Pin tool that will output file:lineno (if known)
+and a callstack each time a user-specified effective memory address is touched.
+
+
+BUILDING MAID
+--
+
+Unpack maid in the top level of the Pin distribution (i.e. pin-2.0/maid)
+
+Type make
+Type make test
+
+
+COMMAND LINE OPTIONS
+--
+
+--addrfile=<address file>
+    Tell MAID to look in a file for a list of addresses to monitor
+
+--outfile=<output file>
+    Tell MAID to send all reporting information to a file.  If not specified,
+    reports will be sent to stdout.
+
+
+REGISTERING ADDRESSES
+--
+
+Additionally, addresses may be registered (and unregistered) at runtime with 
+the functions:
+
+    MAID_register_address(void *)
+    MAID_unregister_address(void *)
+
+Please note that to use these functions, you must define them yourself as
+    void MAID_register_address(void *addr) {}
+    void MAID_unregister_address(void *addr) {}
+
+Since g++ may prepend and append random stuff to the function names, MAID
+searches for functions containing the above substrings.  Therefore, it is not
+advisable to have other functions with names similar to those above.
+
+
+EXAMPLES
+--
+
+Have a look at addrfile.txt and tests/foo.c
+
+To run maid:
+
+pin -t ./maid [options] -- tests/foo
+
+
+BUGS
+--
+
+gcc and g++ aren't so great at providing file:lineno information.  Using icc
+to compile your application will probably result in higher quality output.

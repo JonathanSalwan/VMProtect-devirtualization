@@ -1,0 +1,162 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS :=
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS :=
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS :=
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_ROOTS += modify_ldt load_far_pointer gcc_thread_local_vars
+    APP_ROOTS += modify_ldt load_far_pointer gcc_thread_local_vars_app
+    ifeq ($(TARGET),ia32)
+        TEST_ROOTS += set_thread_area1 set_thread_area2 set_thread_area3 fixed_base_reg
+        APP_ROOTS += set_thread_area1 set_thread_area2 set_thread_area3 fixed_base_reg
+    endif
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+BINUTILS_GE_235 := $(shell $(TOOLS_ROOT)/Utils/testToolVersion `which ld` ge 2.35)
+
+# Mantis 4874
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(TARGET),intel64)
+        ifeq ($(BINUTILS_GE_235),1)
+            TEST_ROOTS := $(filter-out load_far_pointer, $(TEST_ROOTS))
+            APP_ROOTS := $(filter-out load_far_pointer, $(APP_ROOTS))
+        endif
+    endif
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+modify_ldt.test: $(OBJDIR)modify_ldt$(EXE_SUFFIX)
+	$(OBJDIR)modify_ldt$(EXE_SUFFIX) > $(OBJDIR)modify_ldt.out
+	$(PIN) -- $(OBJDIR)modify_ldt$(EXE_SUFFIX) > $(OBJDIR)modify_ldt.pin.out 2>&1
+	$(DIFF) $(OBJDIR)modify_ldt.out $(OBJDIR)modify_ldt.pin.out
+	$(RM) $(OBJDIR)modify_ldt.out $(OBJDIR)modify_ldt.pin.out
+
+set_thread_area1.test: $(OBJDIR)set_thread_area1$(EXE_SUFFIX)
+	$(OBJDIR)set_thread_area1$(EXE_SUFFIX) > $(OBJDIR)set_thread_area1.out
+	$(PIN) -- $(OBJDIR)set_thread_area1$(EXE_SUFFIX) > $(OBJDIR)set_thread_area1.pin.out 2>&1
+	$(DIFF) $(OBJDIR)set_thread_area1.out $(OBJDIR)set_thread_area1.pin.out
+	$(RM) $(OBJDIR)set_thread_area1.out $(OBJDIR)set_thread_area1.pin.out
+
+set_thread_area2.test: $(OBJDIR)set_thread_area2$(EXE_SUFFIX)
+	$(OBJDIR)set_thread_area2$(EXE_SUFFIX) > $(OBJDIR)set_thread_area2.out
+	$(PIN) -- $(OBJDIR)set_thread_area2$(EXE_SUFFIX) > $(OBJDIR)set_thread_area2.pin.out 2>&1
+	$(DIFF) $(OBJDIR)set_thread_area2.out $(OBJDIR)set_thread_area2.pin.out
+	$(RM) $(OBJDIR)set_thread_area2.out $(OBJDIR)set_thread_area2.pin.out
+
+set_thread_area3.test: $(OBJDIR)set_thread_area3$(EXE_SUFFIX)
+	$(OBJDIR)set_thread_area3$(EXE_SUFFIX) > $(OBJDIR)set_thread_area3.out
+	$(PIN) -- $(OBJDIR)set_thread_area3$(EXE_SUFFIX) > $(OBJDIR)set_thread_area3.pin.out 2>&1
+	$(DIFF) $(OBJDIR)set_thread_area3.out $(OBJDIR)set_thread_area3.pin.out
+	$(RM) $(OBJDIR)set_thread_area3.out $(OBJDIR)set_thread_area3.pin.out
+
+# Unable to run this test when virtual_segments is off since we write to gs which is not allowed in 64 bits
+load_far_pointer.test: $(OBJDIR)load_far_pointer$(EXE_SUFFIX)
+	$(OBJDIR)load_far_pointer$(EXE_SUFFIX) > $(OBJDIR)load_far_pointer.out
+	$(PIN) -xyzzy -virtual_segments 1 -- $(OBJDIR)load_far_pointer$(EXE_SUFFIX) > $(OBJDIR)load_far_pointer.pin.out 2>&1
+	$(DIFF) $(OBJDIR)load_far_pointer.out $(OBJDIR)load_far_pointer.pin.out
+	$(RM) $(OBJDIR)load_far_pointer.out $(OBJDIR)load_far_pointer.pin.out
+    
+fixed_base_reg.test: $(OBJDIR)fixed_base_reg$(EXE_SUFFIX)
+	$(OBJDIR)fixed_base_reg$(EXE_SUFFIX) > $(OBJDIR)fixed_base_reg.out
+	$(PIN) -- $(OBJDIR)fixed_base_reg$(EXE_SUFFIX) > $(OBJDIR)fixed_base_reg.pin.out 2>&1
+	$(DIFF) $(OBJDIR)fixed_base_reg.out $(OBJDIR)fixed_base_reg.pin.out
+	$(RM) $(OBJDIR)fixed_base_reg.out $(OBJDIR)fixed_base_reg.pin.out
+
+gcc_thread_local_vars.test: $(OBJDIR)gcc_thread_local_vars_app$(EXE_SUFFIX) 
+	$(PIN) -- $(OBJDIR)gcc_thread_local_vars_app$(EXE_SUFFIX) > $(OBJDIR)gcc_thread_local_vars.log
+	$(DIFF) $(OBJDIR)gcc_thread_local_vars.log gcc_thread_local_vars.reference
+	$(RM) $(OBJDIR)gcc_thread_local_vars.log
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special applications' build rules ######
+
+$(OBJDIR)set_thread_area1$(EXE_SUFFIX): set_thread_area1.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)load_far_pointer$(EXE_SUFFIX): load_far_pointer_$(TARGET).cpp load_far_pointer_$(TARGET)$(ASM_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)fixed_base_reg$(EXE_SUFFIX): fixed_base_reg.cpp movs$(ASM_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)

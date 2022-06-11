@@ -1,0 +1,10 @@
+Calling world from helloX (instrumented AOTI)
+Calling world from helloX (instrumented JIT)
+Calling helloX from tool natively
+Returned from helloX in tool with 'hello world'
+Calling helloX from tool regularly
+	Calling world from helloX (instrumented AOTI)
+	Calling world from helloX (instrumented JIT)
+Returned from helloX in tool with 'hello world'
+Calling helloX from tool natively
+Returned from helloX in tool with 'hello world'

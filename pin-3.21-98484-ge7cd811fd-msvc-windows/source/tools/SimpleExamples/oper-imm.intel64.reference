@@ -1,0 +1,25 @@
+In main application image
+Function operImmCmds found
+Querying instruction w/opcode: PUSH
+No immediate operands per this command
+Querying instruction w/opcode: MOV
+No immediate operands per this command
+Querying instruction w/opcode: MOV
+No immediate operands per this command
+Querying instruction w/opcode: ADD
+Contains an immediate value: 0x10 (signed: 16), operand is 8 bits long.
+Querying instruction w/opcode: MOV
+Contains an immediate value: 0x01 operand is 8 bits long.
+Querying instruction w/opcode: MOV
+Contains an immediate value: 0x0002 operand is 16 bits long.
+Querying instruction w/opcode: MOV
+Contains an immediate value: 0x00000003 operand is 32 bits long.
+Querying instruction w/opcode: ADD
+Contains an immediate value: 0xfffffffffffffffc (signed: -4), operand is 8 bits long.
+Querying instruction w/opcode: MOV
+No immediate operands per this command
+Querying instruction w/opcode: POP
+No immediate operands per this command
+Querying instruction w/opcode: RET_NEAR
+No immediate operands per this command
+Done with function operImmCmds

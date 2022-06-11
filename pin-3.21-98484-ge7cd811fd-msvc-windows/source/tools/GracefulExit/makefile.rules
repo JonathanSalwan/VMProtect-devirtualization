@@ -1,0 +1,330 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := applicationexit create_and_exit_thread
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS := exitProcessFromInstrumentationCallback
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS := exitFromInstCallback_tool
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := create_and_exit_thread_app
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_ROOTS += threadFini threadFini_exception threadFini_sig raceToExit exitApplicationFromThreadFini \
+                  exitApplicationFromFini exitProcessFromRunningThreadFini exitProcessFromBlockedThreadFini \
+                  exitProcessFromFini exitApplicationLocked
+    TOOL_ROOTS += threadFini_tool exitFromFini_tool exitApplicationLocked_tool
+    APP_ROOTS += threadFini_app threadFini_exception_app threadFini_sig_app threadFini_sendsig raceToExit_app \
+                 exitFromFini_app exitApplicationLocked_app
+    OBJECT_ROOTS += threadUtils
+endif
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    TEST_ROOTS += threadFini raceToEnterVm exitApplicationFromThreadFini exitApplicationFromFini \
+                  exitProcessFromRunningThreadFini exitProcessFromBlockedThreadFini exitProcessFromFini \
+                  exitApplicationLocked
+    TOOL_ROOTS += threadFini_tool exitFromFini_tool exitApplicationLocked_tool
+    APP_ROOTS += threadFini_app threadFini_exception_app raceToEnterVm_app exitFromFini_app exitApplicationLocked_app
+    OBJECT_ROOTS += threadUtils
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+# TODO: These tests fail - fix and remove the following:
+
+# See Mantis 3672 for create_and_exit_thread.
+ifeq ($(TARGET_OS),windows)
+    TEST_TOOL_ROOTS := $(filter-out create_and_exit_thread, $(TEST_TOOL_ROOTS))
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+# Test PIN_ExitApplication from both an analysis routine and a callback.
+applicationexit.test: $(OBJDIR)applicationexit$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)applicationexit$(PINTOOL_SUFFIX) -o $(OBJDIR)applicationexit.out -- $(TESTAPP)
+	$(DIFF) -b $(OBJDIR)applicationexit.out applicationexit.master
+	$(PIN) -t $(OBJDIR)applicationexit$(PINTOOL_SUFFIX) -o $(OBJDIR)applicationexit_c.out -c -- $(TESTAPP)
+	$(DIFF) -b $(OBJDIR)applicationexit_c.out applicationexit.master
+	$(RM) $(OBJDIR)applicationexit.out $(OBJDIR)applicationexit_c.out
+
+create_and_exit_thread.test: $(OBJDIR)create_and_exit_thread$(PINTOOL_SUFFIX) $(OBJDIR)create_and_exit_thread_app$(EXE_SUFFIX)
+	$(PIN) -logfile $(OBJDIR)$(@:.test=.log) -xyzzy -mesgon log_depot -mesgon log_syscall -mesgon log_vsm \
+	  -t $(OBJDIR)create_and_exit_thread$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:.test=.out) \
+	    -- $(OBJDIR)create_and_exit_thread_app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.app.out);
+	$(RM) $(OBJDIR)$(@:.test=.log) $(OBJDIR)$(@:.test=.out)
+	$(RM) -f $(OBJDIR)$(@:.test=.app.out)
+
+
+THREAD_FINI_ACTIVE := 6
+
+threadFini.test: $(OBJDIR)threadFini_tool$(PINTOOL_SUFFIX) $(OBJDIR)threadFini_app$(EXE_SUFFIX)
+	testFailed=0; \
+	for trial in 0 1 2 3 4 ; do \
+	  thisTest=0; \
+	  $(PIN) -logfile $(OBJDIR)threadFini.log.$$trial \
+	    -xyzzy -mesgon log_vsm -mesgon log_depot -mesgon log_win -mesgon log_signal \
+	    -t $(OBJDIR)threadFini_tool$(PINTOOL_SUFFIX) \
+	    -startsfile $(OBJDIR)threadStarts.out.$$trial \
+	    -finisfile $(OBJDIR)threadFinis.out.$$trial \
+	    -o $(OBJDIR)threadFini_tool.out.$$trial \
+	      -- $(OBJDIR)threadFini_app$(EXE_SUFFIX) $$trial > $(OBJDIR)threadFini.out.$$trial 2>&1; \
+	  $(SYNC); \
+	  if ! $(BASHTEST) $$? -eq 0; then echo application exited with an error on scenario $$trial; thisTest=1; fi; \
+	  if ! $(QGREP) "fini function 0 $(THREAD_FINI_ACTIVE)" $(OBJDIR)threadFini_tool.out.$$trial; then thisTest=1; fi; \
+	  if ! $(QGREP) "fini function $(THREAD_FINI_ACTIVE) $(THREAD_FINI_ACTIVE)" $(OBJDIR)threadFini_tool.out.$$trial; then thisTest=1; fi; \
+	  if $(BASHTEST) $$trial -ge 2 && ! $(QGREP) "Tool unloaded" $(OBJDIR)threadFini.out.$$trial; then thisTest=1; fi; \
+	  $(SORT) $(OBJDIR)threadStarts.out.$$trial > $(OBJDIR)threadStarts.sorted.$$trial; \
+	  $(SORT) $(OBJDIR)threadFinis.out.$$trial > $(OBJDIR)threadFinis.sorted.$$trial; \
+	  if ! $(CMP) $(OBJDIR)threadStarts.sorted.$$trial $(OBJDIR)threadFinis.sorted.$$trial; then thisTest=1; fi; \
+	  if $(BASHTEST) $$thisTest -eq 1; then echo threadFini scenario $$trial failed; testFailed=1; \
+	  else echo threadFini scenario $$trial passed; fi; \
+	  $(SYNC); \
+	done; \
+	$(BASHTEST) $$testFailed -eq 0
+	$(RM) $(OBJDIR)threadFini.out.* $(OBJDIR)threadFini_tool.out.* $(OBJDIR)threadFini.log.*
+	$(RM) $(OBJDIR)threadStarts.* $(OBJDIR)threadFinis.*
+
+threadFini_exception.test: $(OBJDIR)threadFini_tool$(PINTOOL_SUFFIX) $(OBJDIR)threadFini_exception_app$(EXE_SUFFIX)
+	-$(PIN) -logfile $(OBJDIR)threadFini_exception.log \
+	  -xyzzy -mesgon log_vsm -mesgon log_depot \
+	  -t $(OBJDIR)threadFini_tool$(PINTOOL_SUFFIX) \
+	  -startsfile $(OBJDIR)threadStarts_exception.out \
+	  -finisfile $(OBJDIR)threadFinis_exception.out \
+	    -o $(OBJDIR)threadFini_exception_tool.out \
+	    -- $(OBJDIR)threadFini_exception_app$(EXE_SUFFIX) > $(OBJDIR)threadFini_exception.out 2>&1
+	$(SYNC)
+	$(QGREP) "fini function 0 2" $(OBJDIR)threadFini_exception_tool.out
+	$(SORT) $(OBJDIR)threadStarts_exception.out > $(OBJDIR)threadStarts_exception.sorted
+	$(SORT) $(OBJDIR)threadFinis_exception.out > $(OBJDIR)threadFinis_exception.sorted
+	$(CMP) $(OBJDIR)threadStarts_exception.sorted $(OBJDIR)threadFinis_exception.sorted
+	$(RM) $(OBJDIR)threadFini_exception_tool.out $(OBJDIR)threadFini_exception.out $(OBJDIR)threadFini_exception.log
+	$(RM) $(OBJDIR)threadStarts_exception.* $(OBJDIR)threadFinis_exception.*
+
+threadFini_sig.test: $(OBJDIR)threadFini_tool$(PINTOOL_SUFFIX) $(OBJDIR)threadFini_sig_app$(EXE_SUFFIX) $(OBJDIR)threadFini_sendsig$(EXE_SUFFIX)
+	-$(PIN) -logfile $(OBJDIR)threadFini_sig.log \
+	  -xyzzy -mesgon log_vsm -mesgon log_depot \
+	  -t $(OBJDIR)threadFini_tool$(PINTOOL_SUFFIX) \
+	  -startsfile $(OBJDIR)threadStarts_sig.out \
+	  -finisfile $(OBJDIR)threadFinis_sig.out \
+	  -o $(OBJDIR)threadFini_sig_tool.out \
+	    -- $(OBJDIR)threadFini_sig_app$(EXE_SUFFIX) $(OBJDIR)threadFini_sendsig$(EXE_SUFFIX) > $(OBJDIR)threadFini_sig.out 2>&1
+	$(SYNC)
+	$(QGREP) "fini function 0 2" $(OBJDIR)threadFini_sig_tool.out
+	$(SORT) $(OBJDIR)threadStarts_sig.out > $(OBJDIR)threadStarts_sig.sorted
+	$(SORT) $(OBJDIR)threadFinis_sig.out > $(OBJDIR)threadFinis_sig.sorted
+	$(CMP) $(OBJDIR)threadStarts_sig.sorted $(OBJDIR)threadFinis_sig.sorted
+	$(RM) $(OBJDIR)threadFini_sig.out $(OBJDIR)threadFini_sig.log $(OBJDIR)threadStarts_sig.* $(OBJDIR)threadFinis_sig.*
+	$(RM) $(OBJDIR)threadFini_sig_tool.out
+
+raceToExit.test: $(OBJDIR)threadFini_tool$(PINTOOL_SUFFIX) $(OBJDIR)raceToExit_app$(EXE_SUFFIX)
+	$(PIN) -logfile $(OBJDIR)raceToExit.log \
+	  -xyzzy -mesgon log_vsm -mesgon log_depot \
+	  -t $(OBJDIR)threadFini_tool$(PINTOOL_SUFFIX) \
+	  -startsfile $(OBJDIR)threadStarts_raceToExit.out \
+	  -finisfile $(OBJDIR)threadFinis_raceToExit.out \
+	  -o $(OBJDIR)raceToExit_tool.out \
+	    -- $(OBJDIR)raceToExit_app$(EXE_SUFFIX) > $(OBJDIR)raceToExit.out 2>&1
+	$(SYNC)
+	$(QGREP) "fini function 0 `cat $(OBJDIR)threadStarts_raceToExit.out | $(LINECOUNT)`" $(OBJDIR)raceToExit_tool.out
+	$(SORT) $(OBJDIR)threadStarts_raceToExit.out > $(OBJDIR)threadStarts_raceToExit.sorted
+	$(SORT) $(OBJDIR)threadFinis_raceToExit.out > $(OBJDIR)threadFinis_raceToExit.sorted
+	$(CMP) $(OBJDIR)threadStarts_raceToExit.sorted $(OBJDIR)threadFinis_raceToExit.sorted
+	$(RM) $(OBJDIR)raceToExit.out $(OBJDIR)raceToExit.log $(OBJDIR)threadStarts_raceToExit.* $(OBJDIR)threadFinis_raceToExit.*
+	$(RM) $(OBJDIR)raceToExit_tool.out
+
+raceToEnterVm.test: $(OBJDIR)raceToEnterVm_app$(EXE_SUFFIX)
+	$(PIN) -logfile $(OBJDIR)raceToEnterVm.log \
+	  -xyzzy -mesgon log_vsm -mesgon log_depot \
+	    -- $(OBJDIR)raceToEnterVm_app$(EXE_SUFFIX) > $(OBJDIR)raceToEnterVm.out 2>&1
+	$(SYNC)
+	$(RM) $(OBJDIR)raceToEnterVm.out $(OBJDIR)raceToEnterVm.log
+
+# Scenario #2 occasionally hangs in the nightly on Windows. Disabled until fixed.
+exitApplicationFromThreadFini.test: $(OBJDIR)exitFromFini_tool$(PINTOOL_SUFFIX) $(OBJDIR)exitFromFini_app$(EXE_SUFFIX)
+	testFailed=0; \
+	for trial in 1 ; do \
+	  thisTest=0; \
+	  $(PIN) -logfile $(OBJDIR)exitApplicationFromThreadFini.log.$$trial \
+	    -xyzzy -mesgon log_vsm -mesgon log_depot \
+	    -t $(OBJDIR)exitFromFini_tool$(PINTOOL_SUFFIX) -scenario $$trial \
+	    -startsfile $(OBJDIR)threadStarts_exitApplicationFromThreadFini.out.$$trial \
+	    -finisfile $(OBJDIR)threadFinis_exitApplicationFromThreadFini.out.$$trial \
+	      -- $(OBJDIR)exitFromFini_app$(EXE_SUFFIX) $$trial > $(OBJDIR)exitApplicationFromThreadFini.out.$$trial 2>&1; \
+	  $(SYNC); \
+	  if ! $(QGREP) "It is prohibited to call PIN_ExitApplication() from a thread-fini function" \
+	    $(OBJDIR)exitApplicationFromThreadFini.out.$$trial; then thisTest=1; fi; \
+	  if $(BASHTEST) $$thisTest -eq 1; then echo exitApplicationFromThreadFini scenario $$trial failed; testFailed=1; \
+	    else echo exitApplicationFromThreadFini scenario $$trial passed; fi; \
+	done; \
+	$(BASHTEST) $$testFailed -eq 0
+	$(RM) $(OBJDIR)exitApplicationFromThreadFini.out.* $(OBJDIR)exitApplicationFromThreadFini.log.*
+	$(RM) $(OBJDIR)threadStarts_exitApplicationFromThreadFini.* $(OBJDIR)threadFinis_exitApplicationFromThreadFini.*
+
+exitApplicationFromFini.test: $(OBJDIR)exitFromFini_tool$(PINTOOL_SUFFIX) $(OBJDIR)exitFromFini_app$(EXE_SUFFIX)
+	-$(PIN) -logfile $(OBJDIR)exitApplicationFromFini.log \
+	  -xyzzy -mesgon log_vsm -mesgon log_depot \
+	  -t $(OBJDIR)exitFromFini_tool$(PINTOOL_SUFFIX) -scenario 3 \
+	  -startsfile $(OBJDIR)threadStarts_exitApplicationFromFini.out \
+	  -finisfile $(OBJDIR)threadFinis_exitApplicationFromFini.out \
+	  -logfile $(OBJDIR)exitApplicationFromFini_tool.log \
+	    -- $(OBJDIR)exitFromFini_app$(EXE_SUFFIX) 3 > $(OBJDIR)exitApplicationFromFini.out 2>&1
+	$(SYNC)
+	$(QGREP) "It is prohibited to call PIN_ExitApplication() from an application-fini function" \
+	  $(OBJDIR)exitApplicationFromFini_tool.log
+	$(RM) $(OBJDIR)exitApplicationFromFini.out $(OBJDIR)exitApplicationFromFini.log \
+	  $(OBJDIR)exitApplicationFromFini_tool.log
+	$(RM) $(OBJDIR)threadStarts_exitApplicationFromFini.out $(OBJDIR)threadFinis_exitApplicationFromFini.out
+
+exitProcessFromRunningThreadFini.test: $(OBJDIR)exitFromFini_tool$(PINTOOL_SUFFIX) $(OBJDIR)exitFromFini_app$(EXE_SUFFIX)
+	$(PIN) -logfile $(OBJDIR)exitProcessFromRunningThreadFini.log \
+	  -xyzzy -mesgon log_vsm -mesgon log_depot \
+	  -t $(OBJDIR)exitFromFini_tool$(PINTOOL_SUFFIX) -scenario 4 \
+	  -startsfile $(OBJDIR)threadStarts_exitProcessFromRunningThreadFini.out \
+	  -finisfile $(OBJDIR)threadFinis_exitProcessFromRunningThreadFini.out \
+	    -- $(OBJDIR)exitFromFini_app$(EXE_SUFFIX) 4 > $(OBJDIR)exitProcessFromRunningThreadFini.out 2>&1
+	$(SYNC)
+	$(BASHTEST) `cat $(OBJDIR)threadStarts_exitProcessFromRunningThreadFini.out | $(LINECOUNT)` -eq 2
+	$(BASHTEST) `cat $(OBJDIR)threadFinis_exitProcessFromRunningThreadFini.out | $(LINECOUNT)` -eq 1
+	$(RM) $(OBJDIR)exitProcessFromRunningThreadFini.out $(OBJDIR)exitProcessFromRunningThreadFini.log
+	$(RM) $(OBJDIR)threadStarts_exitProcessFromRunningThreadFini.out $(OBJDIR)threadFinis_exitProcessFromRunningThreadFini.out
+
+exitProcessFromBlockedThreadFini.test: $(OBJDIR)exitFromFini_tool$(PINTOOL_SUFFIX) $(OBJDIR)exitFromFini_app$(EXE_SUFFIX)
+	$(PIN) -logfile $(OBJDIR)exitProcessFromBlockedThreadFini.log \
+	  -xyzzy -mesgon log_vsm -mesgon log_depot \
+	  -t $(OBJDIR)exitFromFini_tool$(PINTOOL_SUFFIX) -scenario 5 \
+	  -startsfile $(OBJDIR)threadStarts_exitProcessFromBlockedThreadFini.out \
+	  -finisfile $(OBJDIR)threadFinis_exitProcessFromBlockedThreadFini.out \
+	    -- $(OBJDIR)exitFromFini_app$(EXE_SUFFIX) 5 > $(OBJDIR)exitProcessFromBlockedThreadFini.out 2>&1
+	$(SYNC)
+	$(BASHTEST) `cat $(OBJDIR)threadStarts_exitProcessFromBlockedThreadFini.out | $(LINECOUNT)` -eq 2
+	$(BASHTEST) `cat $(OBJDIR)threadFinis_exitProcessFromBlockedThreadFini.out | $(LINECOUNT)` -eq 1
+	$(RM) $(OBJDIR)exitProcessFromBlockedThreadFini.out $(OBJDIR)exitProcessFromBlockedThreadFini.log
+	$(RM) $(OBJDIR)threadStarts_exitProcessFromBlockedThreadFini.* $(OBJDIR)threadFinis_exitProcessFromBlockedThreadFini.*
+
+exitProcessFromFini.test: $(OBJDIR)exitFromFini_tool$(PINTOOL_SUFFIX) $(OBJDIR)exitFromFini_app$(EXE_SUFFIX)
+	$(PIN) -logfile $(OBJDIR)exitProcessFromFini.log \
+	  -xyzzy -mesgon log_vsm -mesgon log_depot \
+	  -t $(OBJDIR)exitFromFini_tool$(PINTOOL_SUFFIX) -scenario 6 \
+	  -startsfile $(OBJDIR)threadStarts_exitProcessFromFini.out \
+	  -finisfile $(OBJDIR)threadFinis_exitProcessFromFini.out \
+	    -- $(OBJDIR)exitFromFini_app$(EXE_SUFFIX) 6 > $(OBJDIR)exitProcessFromFini.out 2>&1
+	$(SYNC)
+	$(SORT) $(OBJDIR)threadStarts_exitProcessFromFini.out > $(OBJDIR)threadStarts_exitProcessFromFini.sorted
+	$(SORT) $(OBJDIR)threadFinis_exitProcessFromFini.out > $(OBJDIR)threadFinis_exitProcessFromFini.sorted
+	$(CMP) $(OBJDIR)threadStarts_exitProcessFromFini.sorted $(OBJDIR)threadFinis_exitProcessFromFini.sorted
+	$(RM) $(OBJDIR)exitProcessFromFini.out $(OBJDIR)exitProcessFromFini.log
+	$(RM) $(OBJDIR)threadStarts_exitProcessFromFini.* $(OBJDIR)threadFinis_exitProcessFromFini.*
+
+exitProcessFromInstrumentationCallback.test: $(OBJDIR)exitFromInstCallback_tool$(PINTOOL_SUFFIX) $(TESTAPP)
+	$(PIN) -t $(OBJDIR)exitFromInstCallback_tool$(PINTOOL_SUFFIX) -- $(TESTAPP) ; $(BASHTEST) $$? -eq 123
+
+exitApplicationLocked.test: $(OBJDIR)exitApplicationLocked_tool$(PINTOOL_SUFFIX) $(OBJDIR)exitApplicationLocked_app$(EXE_SUFFIX)
+	-$(PIN) -logfile $(OBJDIR)exitApplicationLocked.log \
+	  -xyzzy -mesgon log_vsm -mesgon log_depot \
+	  -t $(OBJDIR)exitApplicationLocked_tool$(PINTOOL_SUFFIX) \
+	  -startsfile $(OBJDIR)threadStarts_exitApplicationLocked.out \
+	  -finisfile $(OBJDIR)threadFinis_exitApplicationLocked.out \
+	    -- $(OBJDIR)exitApplicationLocked_app$(EXE_SUFFIX) > $(OBJDIR)exitApplicationLocked.out 2>&1
+	$(SYNC)
+	$(QGREP) "fini function 0 2" $(OBJDIR)exitApplicationLocked.out
+	$(SORT) $(OBJDIR)threadStarts_exitApplicationLocked.out > $(OBJDIR)threadStarts_exitApplicationLocked.sorted
+	$(SORT) $(OBJDIR)threadFinis_exitApplicationLocked.out > $(OBJDIR)threadFinis_exitApplicationLocked.sorted
+	$(CMP) $(OBJDIR)threadStarts_exitApplicationLocked.sorted $(OBJDIR)threadFinis_exitApplicationLocked.sorted
+	$(RM) $(OBJDIR)exitApplicationLocked.out $(OBJDIR)exitApplicationLocked.log
+	$(RM) $(OBJDIR)threadStarts_exitApplicationLocked.* $(OBJDIR)threadFinis_exitApplicationLocked.*
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special tools' build rules ######
+
+$(OBJDIR)threadFini_app$(EXE_SUFFIX): threadFini_app.cpp threadUtils.h $(OBJDIR)threadUtils$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(OBJDIR)threadUtils$(OBJ_SUFFIX) $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)threadFini_sig_app$(EXE_SUFFIX): threadFini_sig_app.cpp threadUtils.h $(OBJDIR)threadUtils$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(OBJDIR)threadUtils$(OBJ_SUFFIX) $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)threadFini_exception_app$(EXE_SUFFIX): threadFini_exception_app.cpp threadUtils.h $(OBJDIR)threadUtils$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(OBJDIR)threadUtils$(OBJ_SUFFIX) $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)raceToExit_app$(EXE_SUFFIX): raceToExit_app.cpp threadUtils.h $(OBJDIR)threadUtils$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(OBJDIR)threadUtils$(OBJ_SUFFIX) $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)exitFromFini_app$(EXE_SUFFIX): exitFromFini_app.cpp threadUtils.h $(OBJDIR)threadUtils$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(OBJDIR)threadUtils$(OBJ_SUFFIX) $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)exitApplicationLocked_app$(EXE_SUFFIX): exitApplicationLocked_app.cpp threadUtils.h $(OBJDIR)threadUtils$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(OBJDIR)threadUtils$(OBJ_SUFFIX) $(APP_LDFLAGS) $(APP_LIBS)
+
+###### Special applications' build rules ######
+
+$(OBJDIR)create_and_exit_thread_app$(EXE_SUFFIX): create_and_exit_thread_utils.h
+
+###### Special objects' build rules ######
+
+$(OBJDIR)threadUtils$(OBJ_SUFFIX): threadUtils_$(TARGET_OS).cpp threadUtils.h
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_OBJ)$@ $<

@@ -1,0 +1,23 @@
+#! /bin/bash
+
+# This script gets two arguments:
+# 1) An operand (eq/ne/has) 
+# 2) A name (in lowercase)
+# and returns the result of the comparison.
+#
+# Example usage:
+# To test whether the linux distribution name is sles, run the following command:
+# testLinuxDistName eq sles
+# To test whether the linux distribution name contains the string opensuse, run the following command:
+# testLinuxDistName has opensuse
+
+script_dir=`dirname $0`
+dist_name=`$script_dir/printLinuxDistName`
+
+case $1 in
+    "eq" )   if [[ $dist_name == $2 ]]; then echo 1; else echo 0; fi ;;
+    "ne" )   if [[ $dist_name == $2 ]]; then echo 0; else echo 1; fi ;;
+    "has" )  if [[ $dist_name == *$2* ]]; then echo 1; else echo 0; fi ;;
+    * )     echo "Bad argument $1 (should be eq/ne/has) " ;;
+esac
+

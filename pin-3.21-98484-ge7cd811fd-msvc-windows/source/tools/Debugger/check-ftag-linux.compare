@@ -1,0 +1,8 @@
+Breakpoint 1,.*main
+ftag .*0xffff\s*65535
+ftag .*0xffff\s*65535
+ftag .*0x7fff\s*32767
+ftag .*0x7fff\s*32767
+ftag .*0xffff\s*65535
+ftag .*0xbfff\s*49151
+(Program exited normally.$|\[Inferior 1 \(Remote target\) exited normally\])

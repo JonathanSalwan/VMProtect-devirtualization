@@ -1,0 +1,108 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<VisualStudioProject
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="PinTools"
+	ProjectGUID="{7DD5604A-5559-4BBA-B810-F88184A16F0B}"
+	RootNamespace="PinTools"
+	Keyword="MakeFileProj"
+	>
+	<Platforms>
+		<Platform
+			Name="Win32"
+		/>
+		<Platform
+			Name="x64"
+		/>
+	</Platforms>
+	<ToolFiles>
+	</ToolFiles>
+	<Configurations>
+		<Configuration
+			Name="Debug|Win32"
+			OutputDirectory="..\build\PinTools"
+			IntermediateDirectory="..\build\PinTools"
+			ConfigurationType="0"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="set VCINSTALLDIR=$(VCInstallDir)&#x0D;&#x0A;set VSINSTALLDIR=$(VSInstallDir)&#x0D;&#x0A;set WindowsSdkDir=$(FrameworkSDKDir)&#x0D;&#x0A;nmake DEBUG=1 TARGET=ia32"
+				ReBuildCommandLine="set VCINSTALLDIR=$(VCInstallDir)&#x0D;&#x0A;set VSINSTALLDIR=$(VSInstallDir)&#x0D;&#x0A;set WindowsSdkDir=$(FrameworkSDKDir)&#x0D;&#x0A;nmake DEBUG=1 TARGET=ia32 clean&#x0D;&#x0A;nmake DEBUG=1 TARGET=ia32"
+				CleanCommandLine="set VCINSTALLDIR=$(VCInstallDir)&#x0D;&#x0A;set VSINSTALLDIR=$(VSInstallDir)&#x0D;&#x0A;set WindowsSdkDir=$(FrameworkSDKDir)&#x0D;&#x0A;nmake clean TARGET=ia32 "
+				Output="..\build\Source\pin\pin-windows-ia32\pin.exe"
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Debug|x64"
+			OutputDirectory="..\build\PinTools"
+			IntermediateDirectory="..\build\PinTools"
+			ConfigurationType="0"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="set VCINSTALLDIR=$(VCInstallDir)&#x0D;&#x0A;set VSINSTALLDIR=$(VSInstallDir)&#x0D;&#x0A;set WindowsSdkDir=$(FrameworkSDKDir)&#x0D;&#x0A;nmake DEBUG=1 TARGET=ia32e "
+				ReBuildCommandLine="set VCINSTALLDIR=$(VCInstallDir)&#x0D;&#x0A;set VSINSTALLDIR=$(VSInstallDir)&#x0D;&#x0A;set WindowsSdkDir=$(FrameworkSDKDir)&#x0D;&#x0A;nmake DEBUG=1 TARGET=ia32e clean&#x0D;&#x0A;nmake DEBUG=1 TARGET=ia32e&#x0D;&#x0A;"
+				CleanCommandLine="set VCINSTALLDIR=$(VCInstallDir)&#x0D;&#x0A;set VSINSTALLDIR=$(VSInstallDir)&#x0D;&#x0A;set WindowsSdkDir=$(FrameworkSDKDir)&#x0D;&#x0A;nmake DEBUG=1 TARGET=ia32e clean"
+				Output="Bin\pin.exe"
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Release|Win32"
+			OutputDirectory="..\build\PinTools"
+			IntermediateDirectory="..\build\PinTools"
+			ConfigurationType="0"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="set VCINSTALLDIR=$(VCInstallDir)&#x0D;&#x0A;set VSINSTALLDIR=$(VSInstallDir)&#x0D;&#x0A;set WindowsSdkDir=$(FrameworkSDKDir)&#x0D;&#x0A;nmake TARGET=ia32"
+				ReBuildCommandLine="set VCINSTALLDIR=$(VCInstallDir)&#x0D;&#x0A;set VSINSTALLDIR=$(VSInstallDir)&#x0D;&#x0A;set WindowsSdkDir=$(FrameworkSDKDir)&#x0D;&#x0A;nmake TARGET=ia32 clean&#x0D;&#x0A;nmake TARGET=ia32 "
+				CleanCommandLine="set VCINSTALLDIR=$(VCInstallDir)&#x0D;&#x0A;set VSINSTALLDIR=$(VSInstallDir)&#x0D;&#x0A;set WindowsSdkDir=$(FrameworkSDKDir)&#x0D;&#x0A;nmake TARGET=ia32 clean"
+				Output="Bin\pin.exe"
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Release|x64"
+			OutputDirectory="..\build\PinTools"
+			IntermediateDirectory="..\build\PinTools"
+			ConfigurationType="0"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="set VCINSTALLDIR=$(VCInstallDir)&#x0D;&#x0A;set VSINSTALLDIR=$(VSInstallDir)&#x0D;&#x0A;set WindowsSdkDir=$(FrameworkSDKDir)&#x0D;&#x0A;nmake TARGET=ia32e DEBUG=0"
+				ReBuildCommandLine="set VCINSTALLDIR=$(VCInstallDir)&#x0D;&#x0A;set VSINSTALLDIR=$(VSInstallDir)&#x0D;&#x0A;set WindowsSdkDir=$(FrameworkSDKDir)&#x0D;&#x0A;nmake TARGET=ia32e clean&#x0D;&#x0A;nmake TARGET=ia32e DEBUG=0"
+				CleanCommandLine="set VCINSTALLDIR=$(VCInstallDir)&#x0D;&#x0A;set VSINSTALLDIR=$(VSInstallDir)&#x0D;&#x0A;set WindowsSdkDir=$(FrameworkSDKDir)&#x0D;&#x0A;nmake TARGET=ia32e DEBUG=0 clean"
+				Output="Bin\pin.exe"
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+	</Configurations>
+	<References>
+	</References>
+	<Files>
+	</Files>
+	<Globals>
+	</Globals>
+</VisualStudioProject>

@@ -1,0 +1,11 @@
+Breakpoint 1,\s*main.*at\s*simple.c:17
+Breakpoint 1,\s*main.*at\s*simple.c:17
+Breakpoint 1,\s*main.*at\s*simple.c:17
+Breakpoint 1,\s*main.*at\s*simple.c:17
+Breakpoint 1,\s*main.*at\s*simple.c:17
+Breakpoint 1,\s*main.*at\s*simple.c:17
+Breakpoint 1,\s*main.*at\s*simple.c:17
+Breakpoint 1,\s*main.*at\s*simple.c:17
+Breakpoint 1,\s*main.*at\s*simple.c:17
+Breakpoint 1,\s*main.*at\s*simple.c:17
+(Program exited normally.$|\[Inferior 1 \(Remote target\) exited normally\])

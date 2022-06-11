@@ -1,0 +1,219 @@
+#
+# Copyright (C) 2012-2021 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := dcache edgcnt pinatrace trace icount inscount2_mt opcodemix malloctrace calltrace jumpmix toprtn \
+                   catmix regmix ilenmix coco extmix get_source_location xed-print xed-use ldstmix topopcode regval \
+                   oper-imm bsr_bsf inscount_and_check_tls
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS :=
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := get_source_app regval_app oper_imm_app bsr_bsf_app
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS := oper_imm_asm bsr_bsf_asm
+
+ifeq ($(TARGET_OS),windows)
+	ifeq ($(TARGET),intel64)
+		OBJECT_ROOTS += topopcode_asm
+	endif
+endif
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place architecture-specific definitions here ######
+
+# Place ia32-specific definitions here if they apply to all supported operating systems.
+ifeq ($(TARGET),ia32)
+    TEST_TOOL_ROOTS += emuload
+endif
+
+# Place intel64-specific definitions here if they apply to all supported operating systems.
+ifeq ($(TARGET),intel64)
+    TEST_TOOL_ROOTS += inscount2_vregs
+endif
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_ROOTS += get_source_location_gnu_debug
+    APP_ROOTS += get_source_app_gnu_debug
+    ifeq ($(TARGET),intel64)
+        TEST_TOOL_ROOTS += fence
+    endif
+endif
+
+# macOS*
+ifeq ($(TARGET_OS),mac)
+    ifeq ($(TARGET),intel64)
+        TEST_TOOL_ROOTS += fence
+    endif
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+###### Define the serial subset ######
+
+# Defines which tests need to be run serially as may cause issues when running in parallel
+# see ticket 4915 regarding topopcode 
+ifeq ($(TARGET_OS),windows)
+     SERIAL_SUBSET :=  topopcode
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+# -dwarf_file is not supported on Windows.
+ifeq ($(TARGET_OS),windows)
+    DWARF_FILE_KNOB :=
+else
+    ifeq ($(TARGET_OS),mac)
+        GET_SOURCE_DEBUG_FILE := get_source_app$(EXE_SUFFIX):$(OBJDIR)get_source_app$(EXE_SUFFIX).dSYM/Contents/Resources/DWARF/get_source_app$(EXE_SUFFIX)
+    else
+        GET_SOURCE_DEBUG_FILE := get_source_app$(EXE_SUFFIX):$(OBJDIR)get_source_app$(EXE_SUFFIX)
+    endif
+    DWARF_FILE_KNOB := -dwarf_file $(GET_SOURCE_DEBUG_FILE)
+endif
+			
+get_source_location.test: $(OBJDIR)get_source_location$(PINTOOL_SUFFIX) $(OBJDIR)get_source_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)get_source_location$(PINTOOL_SUFFIX) $(DWARF_FILE_KNOB) \
+	  -- $(OBJDIR)get_source_app$(EXE_SUFFIX) > $(OBJDIR)get_source_location.out 2>&1
+	$(QGREP) "get_source_app.cpp:8" $(OBJDIR)get_source_location.out
+	$(QGREP) "get_source_app.cpp:9" $(OBJDIR)get_source_location.out
+	$(QGREP) "get_source_app.cpp:10" $(OBJDIR)get_source_location.out
+	$(RM) $(OBJDIR)get_source_location.out
+
+get_source_location_gnu_debug.test: $(OBJDIR)get_source_location$(PINTOOL_SUFFIX) $(OBJDIR)get_source_app_gnu_debug$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)get_source_location$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)get_source_app_gnu_debug$(EXE_SUFFIX) > $(OBJDIR)get_source_location_gnu_debug.out 2>&1
+	$(QGREP) "get_source_app.cpp:8" $(OBJDIR)get_source_location_gnu_debug.out
+	$(QGREP) "get_source_app.cpp:9" $(OBJDIR)get_source_location_gnu_debug.out
+	$(QGREP) "get_source_app.cpp:10" $(OBJDIR)get_source_location_gnu_debug.out
+	$(RM) $(OBJDIR)get_source_location_gnu_debug.out
+
+regval.test: $(OBJDIR)regval$(PINTOOL_SUFFIX) $(OBJDIR)regval_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)regval$(PINTOOL_SUFFIX) -o $(OBJDIR)regval.out -- $(OBJDIR)regval_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)regval.out
+
+oper-imm.test: $(OBJDIR)oper-imm$(PINTOOL_SUFFIX) $(OBJDIR)oper_imm_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)oper-imm$(PINTOOL_SUFFIX) -o $(OBJDIR)oper-imm.out -- $(OBJDIR)oper_imm_app$(EXE_SUFFIX)
+	$(DIFF) $(OBJDIR)oper-imm.out oper-imm.$(TARGET).reference
+	$(RM) $(OBJDIR)oper-imm.out
+
+bsr_bsf.test: $(OBJDIR)bsr_bsf$(PINTOOL_SUFFIX) $(OBJDIR)bsr_bsf_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)bsr_bsf$(PINTOOL_SUFFIX) -o $(OBJDIR)bsr_bsf.out -- $(OBJDIR)bsr_bsf_app$(EXE_SUFFIX)
+	$(DIFF) $(OBJDIR)bsr_bsf.out bsr_bsf.reference
+	$(RM) $(OBJDIR)bsr_bsf.out
+
+inscount_and_check_tls.test: $(OBJDIR)inscount_and_check_tls$(PINTOOL_SUFFIX) $(THREAD_APP)
+	$(PIN) -t $(OBJDIR)inscount_and_check_tls$(PINTOOL_SUFFIX) -- $(THREAD_APP) > $(OBJDIR)inscount_and_check_tls.out 2>&1
+	$(RM) $(OBJDIR)inscount_and_check_tls.out
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special tools' build rules ######
+
+$(OBJDIR)opcodemix$(PINTOOL_SUFFIX): $(OBJDIR)opcodemix$(OBJ_SUFFIX) $(CONTROLLERLIB)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)regval$(PINTOOL_SUFFIX): $(OBJDIR)regval$(OBJ_SUFFIX) $(REGVALLIB)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+ifeq ($(TARGET_OS),windows)
+ifeq ($(TARGET),intel64)
+# On Windows 64 bits this tool needs to be linked to asm file.
+$(OBJDIR)topopcode$(PINTOOL_SUFFIX): $(OBJDIR)topopcode$(OBJ_SUFFIX) $(OBJDIR)topopcode_asm$(OBJ_SUFFIX) $(CONTROLLERLIB)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+endif
+endif
+
+
+###### Special applications' build rules ######
+
+$(OBJDIR)get_source_app$(EXE_SUFFIX): get_source_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) \
+	  $(CXX_LPATHS) $(CXX_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)get_source_app_gnu_debug$(EXE_SUFFIX): $(OBJDIR)get_source_app$(EXE_SUFFIX)
+	$(CP) $(OBJDIR)get_source_app$(EXE_SUFFIX) $(OBJDIR)get_source_app_gnu_debug$(EXE_SUFFIX)
+	$(OBJCOPY) --only-keep-debug $(OBJDIR)get_source_app_gnu_debug$(EXE_SUFFIX) $(OBJDIR)get_source_app_gnu_debug.dbg
+	$(OBJCOPY) --strip-debug $(OBJDIR)get_source_app_gnu_debug$(EXE_SUFFIX)
+	$(OBJCOPY) --add-gnu-debuglink=$(OBJDIR)get_source_app_gnu_debug.dbg $(OBJDIR)get_source_app_gnu_debug$(EXE_SUFFIX)
+
+# This application needs to be compiled without optimizations for the placeholder functions to be available to the tool.
+$(OBJDIR)regval_app$(EXE_SUFFIX): regval_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+ifeq ($(TARGET_OS),windows)
+$(OBJDIR)oper_imm_app$(EXE_SUFFIX): oper_imm_app.cpp $(OBJDIR)oper_imm_asm$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) /EXPORT:operImmCmds $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+else
+$(OBJDIR)oper_imm_app$(EXE_SUFFIX): oper_imm_app.cpp $(OBJDIR)oper_imm_asm$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+endif
+
+ifeq ($(TARGET_OS),windows)
+$(OBJDIR)bsr_bsf_app$(EXE_SUFFIX): bsr_bsf_app.cpp $(OBJDIR)bsr_bsf_asm$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) /EXPORT:bsr_func /EXPORT:bsf_func $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+else
+$(OBJDIR)bsr_bsf_app$(EXE_SUFFIX): bsr_bsf_app.cpp $(OBJDIR)bsr_bsf_asm$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+endif

@@ -1,0 +1,184 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := icount filter control control_detach
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS := filter_lib filter_rtn
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := filter_app
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS := one
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS += follow_child
+    TEST_ROOTS += marker_test int3_test multi_start_stop_test control_test
+    APP_ROOTS += itext-marker-test int3-test multi-start-stop-test
+    ifeq ($(TARGET),intel64)
+        # mt3_test has problems on old linux runtimes where thread stack 
+        # is not aligned as the compiler assumes it should be aligned.
+        # Restricting testing to 64b systems.
+        TEST_ROOTS += mt3_test
+        APP_ROOTS += mt3-test
+    endif
+endif
+
+# macOS*
+ifeq ($(TARGET_OS),mac)
+    TEST_TOOL_ROOTS += follow_child
+    TEST_ROOTS += marker_test int3_test multi_start_stop_test mt3_test control_test
+    APP_ROOTS += itext-marker-test int3-test multi-start-stop-test mt3-test
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+marker_test.test: $(OBJDIR)itext-marker-test$(EXE_SUFFIX) $(OBJDIR)control$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)control$(PINTOOL_SUFFIX) -controller-start-itext 0f1ff3 -controller-stop-itext 0f1ff4 \
+	  -- $(OBJDIR)itext-marker-test$(EXE_SUFFIX) > $(OBJDIR)marker_test.out 2>&1
+	$(QGREP) -E '0x.*Start' $(OBJDIR)marker_test.out
+	$(QGREP) -E '0x.*Stop' $(OBJDIR)marker_test.out
+	$(RM) $(OBJDIR)marker_test.out
+
+int3_test.test: $(OBJDIR)int3-test$(EXE_SUFFIX) $(OBJDIR)control$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)control$(PINTOOL_SUFFIX) -controller-start-int3 2 -controller-stop-int3 3 \
+	  -- $(OBJDIR)int3-test$(EXE_SUFFIX) > $(OBJDIR)int3_test.out 2>&1
+	$(QGREP) -E '0x.*Start' $(OBJDIR)int3_test.out
+	$(QGREP) -E '0x.*Stop' $(OBJDIR)int3_test.out
+	$(RM) $(OBJDIR)int3_test.out
+
+multi_start_stop_test.test: $(OBJDIR)multi-start-stop-test$(EXE_SUFFIX) $(OBJDIR)control$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)control$(PINTOOL_SUFFIX) \
+	  -controller-start-address $(GLOBALFUN_PREFIX)mark1 -controller-stop-address $(GLOBALFUN_PREFIX)foo \
+	    -controller-start-address $(GLOBALFUN_PREFIX)mark2 -controller-stop-address $(GLOBALFUN_PREFIX)bar \
+	      -- $(OBJDIR)multi-start-stop-test$(EXE_SUFFIX) > $(OBJDIR)multi_start_stop_test.out 2>&1
+	test `$(CGREP) -E '0x.*Start' $(OBJDIR)multi_start_stop_test.out` -eq 2
+	test `$(CGREP) -E '0x.*Stop' $(OBJDIR)multi_start_stop_test.out` -eq 2
+	$(RM) $(OBJDIR)multi_start_stop_test.out
+
+mt3_test.test: $(OBJDIR)mt3-test$(EXE_SUFFIX) $(OBJDIR)control$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)control$(PINTOOL_SUFFIX) -controller-start-ssc-mark 44332211 -controller-stop-ssc-mark 55332211 \
+	  -- $(OBJDIR)mt3-test$(EXE_SUFFIX) > $(OBJDIR)mt3_test.out 2>&1
+	$(QGREP) -E '0x.*Start' $(OBJDIR)mt3_test.out
+	$(QGREP) -E '0x.*Stop' $(OBJDIR)mt3_test.out
+	$(RM) $(OBJDIR)mt3_test.out
+
+control_test.test: $(OBJDIR)mt3-test$(EXE_SUFFIX) $(OBJDIR)control$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)control$(PINTOOL_SUFFIX) -controller-control "start:ssc:44332211,stop:ssc:55332211" \
+	  -- $(OBJDIR)mt3-test$(EXE_SUFFIX) > $(OBJDIR)mt3_control_test.out 2>&1
+	$(QGREP) -E '0x.*Start' $(OBJDIR)mt3_control_test.out
+	$(QGREP) -E '0x.*Stop' $(OBJDIR)mt3_control_test.out
+	$(RM) $(OBJDIR)mt3_control_test.out
+
+filter_lib.test: $(OBJDIR)filter_app$(EXE_SUFFIX) $(OBJDIR)filter$(PINTOOL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX)
+	$(PIN) -t $(OBJDIR)filter$(PINTOOL_SUFFIX) -filter_no_shared_libs -o $(OBJDIR)filter_lib.out \
+	  -- $(OBJDIR)filter_app$(EXE_SUFFIX)
+	$(QGREP) 'main' $(OBJDIR)filter_lib.out
+	test `$(CGREP) '$(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX)' $(OBJDIR)filter_lib.out` -eq 0
+	$(RM) $(OBJDIR)filter_lib.out
+
+filter_rtn.test: $(OBJDIR)filter_app$(EXE_SUFFIX) $(OBJDIR)filter$(PINTOOL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX)
+	$(PIN) -t $(OBJDIR)filter$(PINTOOL_SUFFIX) -o $(OBJDIR)filter_rtn.out \
+	  -filter_rtn $(GLOBALFUN_PREFIX)one -filter_rtn $(GLOBALFUN_PREFIX)two -- $(OBJDIR)filter_app$(EXE_SUFFIX)
+	test `$(CGREP) 'main' $(OBJDIR)filter_rtn.out` -eq 0
+	$(QGREP) 'two' $(OBJDIR)filter_rtn.out
+	$(QGREP) 'one' $(OBJDIR)filter_rtn.out
+	$(RM) $(OBJDIR)filter_rtn.out
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special tools' build rules ######
+
+$(OBJDIR)control$(PINTOOL_SUFFIX): $(OBJDIR)control$(OBJ_SUFFIX) $(CONTROLLERLIB)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)control_detach$(PINTOOL_SUFFIX): $(OBJDIR)control_detach$(OBJ_SUFFIX) $(CONTROLLERLIB)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+###### Special applications' build rules ######
+
+$(OBJDIR)multi-start-stop-test$(EXE_SUFFIX): multi-start-stop-test.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)mt3-test$(EXE_SUFFIX): test-mt3.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(SSE2) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)filter_app$(EXE_SUFFIX): filter_app.c $(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(PIC) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(PIE) $(APP_LIBS) \
+	  $(OBJDIR)$(DLL_PREFIX)one$(DLL_LINKAGE_SUFFIX)
+
+###### Special DLLs' build rules ######
+$(OBJDIR)$(DLL_PREFIX)one$(DLL_SUFFIX): one.c
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)
+

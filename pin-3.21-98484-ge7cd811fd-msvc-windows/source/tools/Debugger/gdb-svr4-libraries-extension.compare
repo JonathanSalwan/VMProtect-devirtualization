@@ -1,0 +1,23 @@
+0x[0-9a-f]+ in (_start|\?\?) \(\) from [^ ]+
+Breakpoint 1 at 0x[0-9a-f]+
+Breakpoint 2 at 0x[0-9a-f]+
+Breakpoint 3 at 0x[0-9a-f]+
+From[ ]+To[ ]+Syms[ ]+Read[ ]+Shared[ ]+Object[ ]+Library
+0x[0-9a-f]+[ ]+0x[0-9a-f]+[ ]+(Yes|No)[ ]+[^ ]+
+Breakpoint 1, (0x[0-9a-f]+ in )?main \(.*
+From[ ]+To[ ]+Syms[ ]+Read[ ]+Shared[ ]+Object[ ]+Library
+0x[0-9a-f]+[ ]+0x[0-9a-f]+[ ]+(Yes|No)[ ]+[^ ]+
+0x0*d[0-9a-f]+[ ]+0x[0-9a-f]+[ ]+(Yes|No) (\(\*\))?[ ]+ [^ ]+/libc.so[^ ]+
+0x[0-9a-f]+[ ]+0x[0-9a-f]+[ ]+(Yes|No) (\(\*\))?[ ]+ [^ ]+/libdl.so[^ ]+
+Breakpoint 2, 0x[0-9a-f]+ in AfterLoadLibrary \(\)
+From[ ]+To[ ]+Syms[ ]+Read[ ]+Shared[ ]+Object[ ]+Library
+0x[0-9a-f]+[ ]+0x[0-9a-f]+[ ]+(Yes|No)[ ]+[^ ]+
+0x0*d[0-9a-f]+[ ]+0x[0-9a-f]+[ ]+(Yes|No) (\(\*\))?[ ]+ [^ ]+/libc.so[^ ]+
+0x[0-9a-f]+[ ]+0x[0-9a-f]+[ ]+(Yes|No) (\(\*\))?[ ]+ [^ ]+/libdl.so[^ ]+
+0x[0-9a-f]+[ ]+0x[0-9a-f]+[ ]+(Yes|No) (\(\*\))?[ ]+ [^ ]+/libm.so[^ ]*
+Breakpoint 3, 0x[0-9a-f]+ in AfterUnloadLibrary \(\)
+From[ ]+To[ ]+Syms[ ]+Read[ ]+Shared[ ]+Object[ ]+Library
+0x[0-9a-f]+[ ]+0x[0-9a-f]+[ ]+(Yes|No)[ ]+[^ ]+
+0x0*d[0-9a-f]+[ ]+0x[0-9a-f]+[ ]+(Yes|No) (\(\*\))?[ ]+ [^ ]+/libc.so[^ ]+
+0x[0-9a-f]+[ ]+0x[0-9a-f]+[ ]+(Yes|No) (\(\*\))?[ ]+ [^ ]+/libdl.so[^ ]+
+\[Inferior 1 \(Remote target\) exited normally\]

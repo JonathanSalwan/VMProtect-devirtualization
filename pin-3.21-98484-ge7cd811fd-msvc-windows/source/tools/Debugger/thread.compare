@@ -1,0 +1,3 @@
+(Thread [1|2] hit )?Breakpoint [1|2],\s*(.*::)*[parent|child].*at\s*thread.cpp:[25|26|32|33]
+(Thread [1|2] hit )?Breakpoint [1|2],\s*(.*::)*[parent|child].*at\s*thread.cpp:[25|26|32|33]
+(Program exited normally.$|\[Inferior 1 \(Remote target\) exited normally\])

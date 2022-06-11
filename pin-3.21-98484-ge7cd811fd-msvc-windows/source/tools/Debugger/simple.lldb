@@ -1,0 +1,8 @@
+b main
+c
+br set -l 17 -c 'i == 6'
+c
+print Sum
+print i
+br del 1
+c

@@ -1,0 +1,3 @@
+Thread .* stopped at .* \(received event first chance <exception .*>\)
+Caught my exception: 1
+Program exited with 0

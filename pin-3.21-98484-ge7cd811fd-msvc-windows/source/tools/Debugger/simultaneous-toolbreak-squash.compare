@@ -1,0 +1,4 @@
+Stopping in Worker Thread [0-9]+
+GlobalFunction.*at\s*thread-unix.cpp:(88|89)
+Squashed 3 breakpoints
+(Program exited normally.$|\[Inferior 1 \(Remote target\) exited normally\])

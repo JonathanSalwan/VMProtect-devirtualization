@@ -1,0 +1,183 @@
+#
+# Copyright (C) 2015-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := smc_callback smc_disable
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS := smc_sse smc_ia32 smc_mt
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS := flag_ac_tool sse-ref
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := smcapp_ia32 smcapp_mt smcapp1 smcapp2 smcapp3 sse
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS := smc_util sse-ref_asm runnable thread_pool sys_memory
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_ROOTS += smc_except flag_ac_inline_smc
+    APP_ROOTS += smcapp_except flag_ac_app
+endif
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    TEST_ROOTS += smc_except
+    APP_ROOTS += smcapp_except
+    ifeq ($(TARGET),ia32)
+        TEST_ROOTS += smc_bbl
+        APP_ROOTS += smcapp_bbl
+    endif
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+ifeq ($(TARGET_OS),windows)
+    TEST_ROOTS := $(filter-out smc_sse, $(TEST_ROOTS))
+    APP_ROOTS := $(filter-out sse, $(APP_ROOTS))
+    TOOL_ROOTS := $(filter-out sse-ref, $(TOOL_ROOTS))
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+flag_ac_inline_smc.test: $(OBJDIR)flag_ac_tool$(PINTOOL_SUFFIX) $(OBJDIR)flag_ac_app$(EXE_SUFFIX)
+	$(PIN) -smc_strict -xyzzy -smc_check_all -inline 1 -t $(OBJDIR)flag_ac_tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)flag_ac_app$(EXE_SUFFIX) > $(OBJDIR)flag_ac_inline_smc.out 2>&1
+	$(DIFF) $(OBJDIR)flag_ac_inline_smc.out flag_ac_inline.reference
+	$(RM) $(OBJDIR)flag_ac_inline_smc.out
+  
+smc_sse.test: $(OBJDIR)sse-ref$(PINTOOL_SUFFIX) $(OBJDIR)sse$(EXE_SUFFIX)
+	$(PIN) -xyzzy -smc_check_all 1 -t $(OBJDIR)sse-ref$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)sse$(EXE_SUFFIX) 5 > $(OBJDIR)smc_sse.out
+	$(DIFF) --ignore-space-change sse-ref.reference $(OBJDIR)smc_sse.out
+	$(RM) $(OBJDIR)smc_sse.out
+  
+smc_ia32.test: $(OBJDIR)smcapp_ia32$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)smcapp_ia32$(EXE_SUFFIX)
+
+smc_except.test: $(OBJDIR)smcapp_except$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)smcapp_except$(EXE_SUFFIX)
+
+smc_mt.test: $(OBJDIR)smcapp_mt$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)smcapp_mt$(EXE_SUFFIX)
+
+smc_bbl.test: $(OBJDIR)smcapp_bbl$(EXE_SUFFIX)
+	$(PIN) -smc_strict -- $(OBJDIR)smcapp_bbl$(EXE_SUFFIX)
+
+smc_callback.test: $(OBJDIR)smc_callback$(PINTOOL_SUFFIX) $(OBJDIR)smcapp1$(EXE_SUFFIX)
+	$(PIN)  -t $(OBJDIR)smc_callback$(PINTOOL_SUFFIX)  -- $(OBJDIR)smcapp1$(EXE_SUFFIX)
+	$(RM) smcapp1.out
+  
+smc_disable.test: $(OBJDIR)smc_disable$(PINTOOL_SUFFIX) $(OBJDIR)smcapp2$(EXE_SUFFIX)
+	$(PIN) -xyzzy -logfile $(OBJDIR)smc_disable_a.log -statistic  -- $(OBJDIR)smcapp2$(EXE_SUFFIX)
+	$(PIN) -xyzzy -logfile $(OBJDIR)smc_disable_b.log -statistic -t $(OBJDIR)smc_disable$(PINTOOL_SUFFIX)  -- $(OBJDIR)smcapp2$(EXE_SUFFIX)
+	$(GREP) 'SvtRegions::Total ' $(OBJDIR)smc_disable_b.log | $(AWK) '{exit !($$3 == 0)}'
+	count_a=`$(GREP) 'SvtRegions::Total ' $(OBJDIR)smc_disable_a.log | $(AWK) '{printf $$3}'` ; \
+	count_b=`$(GREP) 'SvtRegions::Total ' $(OBJDIR)smc_disable_b.log | $(AWK) '{printf $$3}'` ; \
+	diffcount=$$((count_a - count_b)) ; \
+  echo $$diffcount;\
+	$(BASHTEST) $$diffcount -ge 1
+	$(RM) $(OBJDIR)smc_disable_a.log $(OBJDIR)smc_disable_b.log
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special applications' build rules ######
+
+$(OBJDIR)flag_ac_app$(EXE_SUFFIX): flag_ac_app.c  $(OBJDIR)flag_ac_app_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+  
+$(OBJDIR)smcapp_ia32$(EXE_SUFFIX): smcapp_ia32.cpp $(RUNNABLE) $(THREADPOOL) $(SYSMEMORY) $(THREADLIB) $(OBJDIR)smc_util$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)smcapp_except$(EXE_SUFFIX): smcapp_except.cpp $(RUNNABLE) $(THREADPOOL) $(SYSMEMORY) $(THREADLIB) $(OBJDIR)smc_util$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)smcapp_mt$(EXE_SUFFIX): smcapp_mt.cpp $(RUNNABLE) $(THREADPOOL) $(SYSMEMORY) $(THREADLIB) $(OBJDIR)smc_util$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)smcapp_bbl$(EXE_SUFFIX): smcapp_bbl.cpp $(RUNNABLE) $(THREADPOOL) $(SYSMEMORY) $(THREADLIB) $(OBJDIR)smc_util$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+  
+$(OBJDIR)sse$(EXE_SUFFIX): sse.cpp $(OBJDIR)sse-ref_asm$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(SSE2) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+  
+$(OBJDIR)smcapp1$(EXE_SUFFIX): smcapp1.cpp $(RUNNABLE) $(THREADPOOL) $(SYSMEMORY) $(THREADLIB) $(OBJDIR)smc_util$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+  
+$(OBJDIR)smcapp2$(EXE_SUFFIX): smcapp2.cpp $(RUNNABLE) $(THREADPOOL) $(SYSMEMORY) $(THREADLIB) $(OBJDIR)smc_util$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+  
+$(OBJDIR)smcapp3$(EXE_SUFFIX): smcapp3.cpp $(RUNNABLE) $(THREADPOOL) $(SYSMEMORY) $(THREADLIB) $(OBJDIR)smc_util$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+  
+###### Special objects' build rules ######
+
+$(OBJDIR)smc_util$(OBJ_SUFFIX): smc_util.cpp smc_util.h
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_OBJ)$@ $< $(CXX_LPATHS) $(CXX_LIBS)
+
+

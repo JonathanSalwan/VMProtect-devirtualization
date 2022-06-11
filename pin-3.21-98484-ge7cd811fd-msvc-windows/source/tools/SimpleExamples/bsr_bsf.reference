@@ -1,0 +1,4 @@
+BSR destination operand is undefined (source equals zero).
+BSR destination operand is valid (source is not zero).
+BSF destination operand is undefined (source equals zero).
+BSF destination operand is valid (source is not zero).

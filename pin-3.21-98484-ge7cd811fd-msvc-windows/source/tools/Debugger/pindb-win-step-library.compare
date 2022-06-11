@@ -1,0 +1,6 @@
+Thread .* stopped at .* \(loaded image .*\\win-foo-library.dll\)
+Thread .* stopped at .* \(after step\)
+This is the Foo\(\) function
+Thread .* stopped at .* \(unloaded image .*\\win-foo-library.dll\)
+Thread .* stopped at .* \(after step\)
+Program exited with 0

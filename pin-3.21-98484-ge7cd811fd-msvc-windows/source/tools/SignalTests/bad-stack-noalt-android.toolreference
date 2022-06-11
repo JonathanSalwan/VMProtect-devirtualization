@@ -1,0 +1,5 @@
+Intercepting signal SIGILL, which is an exception, application handles
+Intercepting signal SIGSEGV, application handles
+Intercepting signal SIGSEGV, application handles
+Got fatal signal SIGSEGV
+Program exited

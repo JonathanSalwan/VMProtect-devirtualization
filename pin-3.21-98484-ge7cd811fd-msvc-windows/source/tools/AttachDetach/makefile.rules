@@ -1,0 +1,1032 @@
+#
+# Copyright (C) 2012-2021 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS :=
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS := pause_msg_log
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS :=
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(ATTACH),1)
+        TEST_TOOL_ROOTS += detach_syscall change_mask ld_linux_attach
+        TEST_ROOTS += attach_jit verify_sigmask_jit attach_and_execv blocked_threads verify_fpstate attach_in_sighandler \
+                      attach_in_sighandler1 pause_msg pause_msg1 attach_twice attach_denied detach instr_detach anls_detach \
+                      tls_check_detach detach_in_sighandler detach_in_sighandler1 attach_thread_count_jit attach_mt_fini \
+                      auxv_query_jit attach_probe short_func_instrumentation thread_order detach_probed reattach_probed \
+                      reattach_fork reattach_verify_sigmask reattach_read_write detach_probed_wait_child auxv_query_probe \
+                      launchReattachThreadDetachCallbacks attachReattachThreadDetachCallbacks \
+                      zombie_main_thread_command_line_attach zombie_main_thread_api_attach attachReattachThreadDetachCallbacks_jit \
+                      zombie_secondary_thread_command_line_attach zombie_secondary_thread_api_attach tool_relative_path attach_removed_app \
+                      check_blocking_real_time_signals detach_check_extended_state1 detach_check_extended_state2
+        TOOL_ROOTS += jit_tool jit_detach_tool jit_instr_detach jit_anls_detach detach_check_tool simple_tool probe_tool \
+                      short_func_tool detach_probed_tool reattach_probed_tool threadOrder_tool reattachZombie_tool \
+                      reattachThreadDetachCallbacks_tool check_blocking_real_time_signals_tool detach_after_addss
+        APP_ROOTS += mt_attach verify_sigmask short_func_app mt_blocked mt_detach mt_thread tls_app_linux threadOrder \
+                     verify_fpstate_app attach_in_sighandler_app detach_in_sighandler_app mt_attach_and_execv pause_msg_app \
+                     detach_probed_app detach_probed_wait_child_app detach_syscall_app attach_app mt_fork_app \
+                     launchReattachThreadDetachCallbacks_app attachReattachThreadDetachCallbacks_app my_exe read_write_app \
+                     reattach_probed_app reattach_verify_sigmask_app change_mask_app secondary_attach_app main_attach_app \
+                     secondary_command_line_app main_command_line_app chdir_app attach_removed_app check_blocking_real_time_signals_app \
+                     ld_linux_attach_app add_floats
+        OBJECT_ROOTS += fp_save_restore zombie_utils zombie_utils_tool
+        
+    endif
+    TEST_ROOTS += reattach_jit reattach_jit_fork reattach_jit_read_write reattach_jit_verify_sigmask \
+                  launchReattachThreadDetachCallbacks_jit
+    TOOL_ROOTS += reattach_jit_tool reattachThreadDetachCallbacks_jit_tool
+    APP_ROOTS +=  reattach_jit_app launchReattachThreadDetachCallbacks_app
+    OBJECT_ROOTS += my_dll
+    DLL_ROOTS += my_dll my_dll_1
+
+	# True if gcc version is lower than 4.2 
+    SSE4_NOT_SUPPORTED := $(shell $(TOOLS_ROOT)/Utils/testToolVersion $(CXXPATH) lt 4.2)
+    ifeq ($(SSE4_NOT_SUPPORTED),0)
+        # gcc version euqal or greater than 4.2
+        TEST_ROOTS += detach_check_extended_state3
+        OBJECT_ROOTS += check_xmms_asm
+        APP_ROOTS += check_xmms_app
+        TOOL_ROOTS += check_xmms_tool
+    endif
+endif
+
+# macOS*
+ifeq ($(TARGET_OS),mac)
+    TEST_TOOL_ROOTS += change_mask
+    TEST_ROOTS += attach_thread_count_jit attach_jit attach_and_create_thread attach_on_select detach anls_detach \
+                  detach_probed reattach_probed verify_fpstate attach_in_sighandler attach_in_sighandler1 reattach_fork \
+                  attach_mt_fini attach_twice tool_relative_path launchReattachThreadDetachCallbacks \
+                  attachReattachThreadDetachCallbacks attach_removed_app_mac verify_sigmask_jit attach_and_execv \
+                  blocked_threads detach_probed_wait_child reattach_verify_sigmask reattach_read_write pause_msg \
+                  detach_probed_wait_child_with_replace_signature pause_msg1 thread_order attach_denied tls_check_detach tls_check_detach_probe \
+                  tls_check_attach_detach tls_check_attach_detach_probe detach_check_sigmask detach_check_extended_state1 \
+                  detach_check_extended_state2 detach_check_extended_state3
+    TOOL_ROOTS += jit_tool probe_tool jit_detach_tool jit_anls_detach detach_probed_tool reattach_probed_tool \
+                  reattachThreadDetachCallbacks_tool simple_tool threadOrder_tool detach_check_tool check_xmms_tool detach_after_addss
+    APP_ROOTS += mt_attach mt_thread attach_app mt_detach detach_probed_app reattach_probed_app \
+                 verify_fpstate_app attach_in_sighandler_app mt_fork_app my_exe chdir_app change_mask_app\
+                 launchReattachThreadDetachCallbacks_app attachReattachThreadDetachCallbacks_app \
+                 attach_removed_app verify_sigmask mt_attach_and_execv mt_blocked detach_probed_wait_child_app \
+                 reattach_verify_sigmask_app read_write_app pause_msg_app threadOrder tls_app_mac tls_attach_detach_app_mac \
+                 detach_check_sigmask_app check_xmms_app add_floats
+    DLL_ROOTS += my_dll my_dll_1
+    OBJECT_ROOTS += fp_save_restore my_dll check_xmms_asm
+endif
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    TEST_TOOL_ROOTS += w_attach_tool1 w_attach_tool2 w_attach_tool3 w_attach_tool4 w_attach_tool5 w_simple_attach_tool read_stdin
+    TEST_ROOTS += w_attach_tool1_ror w_attach_tool1_detach_reattach w_attach_tool1_service callbacks_before_jit callbacks_before_probe \
+                  w_attach_tool2_detach_reattach_stress detach_check_extended_state1 detach_check_extended_state2 \
+                  detach_check_extended_state3
+    TOOL_ROOTS += w_attach_mt_thread_tool detach_after_addss check_xmms_tool
+    APP_ROOTS += w_app1 w_app2 w_app3 w_app4 w_app_launcher w_app_launcher2 w_service_app1 w_pin_service_launcher \
+                 w_simple_app read_stdin_app w_attach_mt_thread_app add_floats check_xmms_app
+    DLL_ROOTS += my_dll my_dll_1
+    OBJECT_ROOTS += my_dll check_xmms_asm
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+# Check if machine support AVX
+ifneq ($(TARGET_HAS_DEPENDENCIES),)
+    ifeq ($(wildcard $(CHECKAVX)),)
+        $(error Unable to proceed. Run "make avxcheck", then try again)
+    else
+        MACHINE_SUPPORTS_AVX_INSTRUCTIONS := $(shell $(CHECKAVX))
+    endif
+endif
+
+# For machines that don't support AVX, exclude these tests as they contain hard coded AVX
+# instructions that result with illegal instruction.
+ifeq ($(MACHINE_SUPPORTS_AVX_INSTRUCTIONS),No)
+    # detach_check_extended_state3 uses SSE 4.1 (PINSR*). For simplicity filtering out on machines with no AVX support. 
+    TEST_ROOTS := $(filter-out detach_check_extended_state3, $(TEST_ROOTS))
+    TOOL_ROOTS := $(filter-out check_xmms_tool, $(TOOL_ROOTS))
+    APP_ROOTS := $(filter-out check_xmms_app, $(APP_ROOTS))
+endif
+
+ifeq ($(TARGET_OS),mac)
+    # attach_on_select - Due to bug in macOS* older than Mavericks this test crashes the machine causing it to restart
+    MAVERICKS_OR_OLDER := $(shell /usr/bin/sw_vers | $(GREP) ProductVersion: | $(AWK) '{split($$2, a, "."); print (a[2] <= 9)}')
+    ifeq ($(MAVERICKS_OR_OLDER),1)
+        TEST_ROOTS := $(filter-out attach_on_select, $(TEST_ROOTS))
+    endif
+endif
+
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+# Mantis 3421 - detach_syscall
+# Mantis 3427 - reattach_probed
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS := $(filter-out detach_syscall, $(TEST_TOOL_ROOTS))
+    TEST_ROOTS := $(filter-out reattach_probed, $(TEST_ROOTS))
+endif
+
+ifeq ($(TARGET_OS),mac)
+    # See mantis 4674
+    MACOS_VERSION_GE_1014 := $(shell $(TOOLS_ROOT)/Utils/testMacOsVersion ge 10.14.0)
+    ifeq ($(MACOS_VERSION_GE_1014), 1)
+        TEST_ROOTS := $(filter-out attach_jit attach_mt_fini attach_on_select attach_twice verify_sigmask_jit, $(TEST_ROOTS))
+    endif
+    
+    ifeq ($(SIP_ENABLED),1)
+        # See mantis 4862
+        TEST_ROOTS := $(filter-out attach_and_create_thread attach_and_execv attach_in_sighandler attach_in_sighandler1 \
+                      attach_removed_app_mac attach_thread_count_jit blocked_threads detach pause_msg thread_order \
+                      tls_check_attach_detach_probe tls_check_attach_detach tool_relative_path verify_fpstate \
+                      attachReattachThreadDetachCallbacks change_mask, $(TEST_ROOTS))
+    endif
+    
+    MACOS_VERSION_GE_1100 := $(shell $(TOOLS_ROOT)/Utils/testMacOsVersion ge 11.0.0)
+    ifeq ($(MACOS_VERSION_GE_1100), 1)
+        # See mantis 4883
+        TEST_ROOTS := $(filter-out attach_and_execv, $(TEST_ROOTS))
+    endif
+
+endif
+
+# TODO: These tests fail - fix and remove the following:
+# See Mantis 2688
+ifeq ($(TARGET_OS),windows)
+    TEST_TOOL_ROOTS := $(filter-out w_attach_tool2, $(TEST_TOOL_ROOTS))
+    TEST_ROOTS := $(filter-out w_attach_tool2_detach_reattach_stress, $(TEST_ROOTS))
+endif
+
+# see mantis 4778
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(DIST_NAME_FEDORA),1)
+        DIST_VER_GE_30 := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion ge 30)
+        ifeq ($(DIST_VER_GE_30),1)
+            TEST_ROOTS := $(filter-out detach_in_sighandler detach_in_sighandler1, $(TEST_ROOTS))
+            APP_ROOTS := $(filter-out detach_in_sighandler_app, $(APP_ROOTS))
+        endif
+    endif
+endif
+
+# see mantis 4820
+ifeq ($(TARGET),ia32)
+    ifeq ($(TARGET_OS),linux)
+        DISABLE_FOR_4820 = 0
+        ifeq ($(DIST_NAME_UBUNTU),1)
+            KERNEL_VER_GE_530 := $(shell $(TOOLS_ROOT)/Utils/testLinuxKernelVersion ge 5.3.0)
+            ifeq ($(KERNEL_VER_GE_530),1)
+                DISABLE_FOR_4820 = 1
+            endif
+        endif
+        ifeq ($(DIST_NAME_SUSE),1)
+            DIST_VER_GE_15_2 := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion ge 15.2)
+            ifeq ($(DIST_VER_GE_15_2),1)
+                DISABLE_FOR_4820 = 1
+            endif
+        endif
+        ifeq ($(DISABLE_FOR_4820),1)
+            TEST_ROOTS := $(filter-out detach_in_sighandler detach_in_sighandler1, $(TEST_ROOTS))
+            APP_ROOTS := $(filter-out detach_in_sighandler_app, $(APP_ROOTS))
+        endif
+    endif
+endif
+
+# see mantis 4696
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(ICC),1)
+        TEST_ROOTS := $(filter-out detach detach_in_sighandler detach_in_sighandler1, $(TEST_ROOTS))
+        TOOL_ROOTS := $(filter-out jit_detach_tool , $(TOOL_ROOTS))
+        APP_ROOTS := $(filter-out detach_in_sighandler_app mt_detach, $(APP_ROOTS))
+    endif
+endif
+
+# see mantis 4873
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(TARGET),ia32)
+        ifeq ($(DIST_NAME_CENTOS),1)
+            DIST_VER_GE_82 := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion ge 8.2)
+            ifeq ($(DIST_VER_GE_82),1)
+                TEST_ROOTS := $(filter-out detach_in_sighandler detach_in_sighandler1, $(TEST_ROOTS))
+                APP_ROOTS := $(filter-out detach_in_sighandler_app, $(APP_ROOTS))
+            endif
+        endif
+        ifeq ($(DIST_NAME_RHEL),1)
+            DIST_VER_GE_84 := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion ge 8.4)
+            ifeq ($(DIST_VER_GE_84),1)
+                TEST_ROOTS := $(filter-out detach_in_sighandler detach_in_sighandler1, $(TEST_ROOTS))
+                APP_ROOTS := $(filter-out detach_in_sighandler_app, $(APP_ROOTS))
+            endif
+        endif
+    endif
+endif
+
+###### Define the serial subset ######
+
+# Defines which tests need to be run serially as may cause issues when running in parallel 
+ifeq ($(TARGET_OS),windows)
+    SERIAL_SUBSET := read_stdin
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+ifeq ($(TARGET_OS),linux)
+    # See Mantis 4604 (reattach_jit_verify_sigmask) 4628 (reattach_read_write)
+    SANITY_SUBSET := $(filter-out reattach_jit_verify_sigmask reattach_read_write, $(SANITY_SUBSET))
+    # See Mantis 3420.
+    SANITY_SUBSET := $(filter-out reattach_verify_sigmask, $(SANITY_SUBSET))
+    # See Mantis 4682.
+    SANITY_SUBSET := $(filter-out reattach_jit_read_write, $(SANITY_SUBSET))
+    # See Mantis 4917.
+    SANITY_SUBSET := $(filter-out reattach_jit, $(SANITY_SUBSET))
+
+    ifeq ($(TARGET),intel64)
+    	# See Mantis 4480.
+    	SANITY_SUBSET := $(filter-out reattach_fork, $(SANITY_SUBSET))
+    endif
+endif
+
+ifeq ($(TARGET_OS),mac)
+    # See Mantis 4480.
+    SANITY_SUBSET := $(filter-out reattach_fork, $(SANITY_SUBSET))
+    # See Mantis 4829.
+    SANITY_SUBSET := $(filter-out reattach_probed, $(SANITY_SUBSET))
+
+    MACOS_VERSION_GE_1014 := $(shell $(TOOLS_ROOT)/Utils/testMacOsVersion ge 10.14.0)
+
+    ifeq ($(MACOS_VERSION_GE_1014), 1)
+        # See mantis 4752
+        SANITY_SUBSET := $(filter-out reattach_verify_sigmask, $(SANITY_SUBSET))
+        ifeq ($(TARGET),intel64)
+            # See mantis 4828
+            SANITY_SUBSET := $(filter-out change_mask, $(SANITY_SUBSET))
+        endif
+    endif
+endif
+
+# see mantis 4806
+ifeq ($(TARGET_OS),linux)
+    SANITY_SUBSET := $(filter-out reattach_jit, $(SANITY_SUBSET))
+    ifeq ($(DIST_NAME_FEDORA),1)
+        DIST_VER_GE_31 := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion ge 31)
+        ifeq ($(DIST_VER_GE_31),1)
+            SANITY_SUBSET := $(filter-out reattach_jit_fork reattach_jit_app, $(SANITY_SUBSET))
+        endif
+    endif
+endif
+
+ifeq ($(TARGET_OS),windows)
+    ifeq ($(TARGET),ia32)
+        # mantis 4913
+        SANITY_SUBSET := $(filter-out callbacks_before_jit, $(SANITY_SUBSET))
+    endif
+endif
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+w_attach_tool1.test: $(OBJDIR)w_attach_tool1$(PINTOOL_SUFFIX) $(OBJDIR)w_app1$(EXE_SUFFIX) $(OBJDIR)w_app_launcher$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)pid1.log
+	$(OBJDIR)w_app_launcher$(EXE_SUFFIX) $(OBJDIR)w_app1$(EXE_SUFFIX) > $(OBJDIR)pid1.log
+	$(PIN) -probe -follow_execv -pid `cat $(OBJDIR)pid1.log` -t $(OBJDIR)w_attach_tool1$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)pid1.log
+	$(OBJDIR)w_app_launcher$(EXE_SUFFIX) $(OBJDIR)w_app1$(EXE_SUFFIX) > $(OBJDIR)pid1.log
+	$(PIN) -probe -pid `cat $(OBJDIR)pid1.log` -t $(OBJDIR)w_attach_tool1$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)pid1.log
+
+w_attach_tool1_ror.test: $(OBJDIR)w_attach_tool1$(PINTOOL_SUFFIX) $(OBJDIR)w_app1$(EXE_SUFFIX) $(OBJDIR)w_app_launcher$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)pid1_ror.log
+	$(OBJDIR)w_app_launcher $(OBJDIR)w_app1 > $(OBJDIR)pid1_ror.log
+	$(PIN) -probe -follow_execv -pid `cat $(OBJDIR)pid1_ror.log` -t $(OBJDIR)w_attach_tool1$(PINTOOL_SUFFIX) -ror 1 -fc 2
+	$(RM) -f $(OBJDIR)pid1_ror.log
+
+w_attach_tool1_detach_reattach.test: $(OBJDIR)w_attach_tool1$(PINTOOL_SUFFIX) $(OBJDIR)w_app1$(EXE_SUFFIX) $(OBJDIR)w_app_launcher$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)detach_reattach.log
+	$(PIN) -probe -detach_reattach 1 -follow_execv \
+	  -t $(OBJDIR)w_attach_tool1$(PINTOOL_SUFFIX) -xyzzy -attach_cycles 3 -fc 2 \
+	    -- $(OBJDIR)w_app1$(EXE_SUFFIX) > $(OBJDIR)detach_reattach.log
+	$(RM) -f $(OBJDIR)detach_reattach.log
+	$(OBJDIR)w_app_launcher$(EXE_SUFFIX) $(OBJDIR)w_app1$(EXE_SUFFIX) > $(OBJDIR)pid1_detach_reattach.log
+	$(PIN) -probe -detach_reattach 1 -follow_execv -pid `cat $(OBJDIR)pid1_detach_reattach.log` \
+	  -t $(OBJDIR)w_attach_tool1$(PINTOOL_SUFFIX) -attach_cycles 3 -fc 2
+	$(RM) -f $(OBJDIR)pid1_detach_reattach.log
+
+w_attach_tool1_service.test: $(OBJDIR)w_attach_tool1$(PINTOOL_SUFFIX) $(OBJDIR)w_service_app1$(EXE_SUFFIX) $(OBJDIR)w_pin_service_launcher$(EXE_SUFFIX)
+	chmod 777 $(OBJDIR)
+	$(RM) -f $(OBJDIR)pid1_service.log $(OBJDIR)w_service_app1.exe.service.log $(OBJDIR)is_able_to_create_service.log
+	$(OBJDIR)w_service_app1$(EXE_SUFFIX) -admin -create 2 > $(OBJDIR)is_able_to_create_service.log
+	cat $(OBJDIR)is_able_to_create_service.log
+	$(OBJDIR)w_service_app1$(EXE_SUFFIX) -admin -start > $(OBJDIR)pid1_service.log
+	$(OBJDIR)w_pin_service_launcher$(EXE_SUFFIX) -admin -create
+	$(OBJDIR)w_pin_service_launcher$(EXE_SUFFIX) -admin -start ../$(PIN) -probe -pid `cat $(OBJDIR)pid1_service.log` \
+	  -t w_attach_tool1$(PINTOOL_SUFFIX)
+	$(OBJDIR)w_service_app1$(EXE_SUFFIX) -admin -stop
+	$(OBJDIR)w_service_app1$(EXE_SUFFIX) -admin -delete
+	$(OBJDIR)w_pin_service_launcher$(EXE_SUFFIX) -admin -stop
+	$(OBJDIR)w_pin_service_launcher$(EXE_SUFFIX) -admin -delete
+	$(GREP) "Failed to Create service" $(OBJDIR)is_able_to_create_service.log || \
+	  $(GREP) "Success! someone changed DoLoop on time" $(OBJDIR)w_service_app1.exe.service.log
+	$(RM) -f $(OBJDIR)pid1_service.log $(OBJDIR)w_service_app1.exe.service.log $(OBJDIR)is_able_to_create_service.log \
+	  $(OBJDIR)w_pin_service_launcher.exe.service.log
+
+w_attach_tool2.test: $(OBJDIR)w_attach_tool2$(PINTOOL_SUFFIX) $(OBJDIR)w_app1$(EXE_SUFFIX) $(OBJDIR)w_app_launcher$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)pid2.log
+	$(OBJDIR)w_app_launcher$(EXE_SUFFIX) $(OBJDIR)w_app1$(EXE_SUFFIX) > $(OBJDIR)pid2.log
+	$(PIN) -detach_reattach 1 -probe -pid `cat $(OBJDIR)pid2.log` -t $(OBJDIR)w_attach_tool2$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)pid2.log
+
+w_attach_tool2_detach_reattach_stress.test: $(OBJDIR)w_attach_tool2$(PINTOOL_SUFFIX) $(OBJDIR)w_app1$(EXE_SUFFIX) $(OBJDIR)w_app_launcher$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)pid2_stress.log
+	$(OBJDIR)w_app_launcher$(EXE_SUFFIX) $(OBJDIR)w_app1$(EXE_SUFFIX) > $(OBJDIR)pid2_stress.log
+	$(PIN) -detach_reattach 1 -probe -pid `cat $(OBJDIR)pid2_stress.log` \
+	  -t $(OBJDIR)w_attach_tool2$(PINTOOL_SUFFIX) -stress_dr 10
+	$(RM) -f $(OBJDIR)pid2_stress.log
+
+w_attach_tool3.test: $(OBJDIR)w_attach_tool3$(PINTOOL_SUFFIX) $(OBJDIR)w_app2$(EXE_SUFFIX) $(OBJDIR)w_app_launcher$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)pid3.log
+	$(OBJDIR)w_app_launcher$(EXE_SUFFIX) $(OBJDIR)w_app2$(EXE_SUFFIX) > $(OBJDIR)pid3.log
+	$(PIN) -pid `cat $(OBJDIR)pid3.log` -t $(OBJDIR)w_attach_tool3$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)pid3.log
+	$(OBJDIR)w_app_launcher$(EXE_SUFFIX) $(OBJDIR)w_app2$(EXE_SUFFIX) > $(OBJDIR)pid3.log
+	$(PIN) -follow_execv -pid `cat $(OBJDIR)pid3.log` -t $(OBJDIR)w_attach_tool3$(PINTOOL_SUFFIX) -fc 1
+	$(RM) -f $(OBJDIR)pid3.log
+
+w_attach_tool4.test: $(OBJDIR)w_attach_tool4$(PINTOOL_SUFFIX) $(OBJDIR)w_app3$(EXE_SUFFIX) $(OBJDIR)w_app_launcher$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)pid4.log
+	$(OBJDIR)w_app_launcher$(EXE_SUFFIX) $(OBJDIR)w_app3$(EXE_SUFFIX) > $(OBJDIR)pid4.log
+	$(PIN) -pid `cat $(OBJDIR)pid4.log` -t $(OBJDIR)w_attach_tool4$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)pid4.log
+
+w_attach_tool5.test: $(OBJDIR)w_attach_tool5$(PINTOOL_SUFFIX) $(OBJDIR)w_app4$(EXE_SUFFIX) $(OBJDIR)w_app_launcher$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)pid5.log w_app4.log
+	$(OBJDIR)w_app_launcher$(EXE_SUFFIX) $(OBJDIR)w_app4$(EXE_SUFFIX) > $(OBJDIR)pid5.log
+	$(PIN) -pid `cat $(OBJDIR)pid5.log` -t $(OBJDIR)w_attach_tool5$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)pid5.log w_app4.log
+
+callbacks_before_jit.test: $(OBJDIR)w_attach_mt_thread_tool$(PINTOOL_SUFFIX) $(OBJDIR)w_attach_mt_thread_app$(EXE_SUFFIX) $(OBJDIR)w_app_launcher2$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)callbacks_before_jit.log
+	$(OBJDIR)w_app_launcher2$(EXE_SUFFIX) $(OBJDIR)w_attach_mt_thread_app$(EXE_SUFFIX) > $(OBJDIR)callbacks_before_jit.log
+	$(PIN) -pid `cat $(OBJDIR)callbacks_before_jit.log` -t $(OBJDIR)w_attach_mt_thread_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)callbacks_before_jit_tool.out
+	$(RM) -f $(OBJDIR)callbacks_before_jit.log
+
+callbacks_before_probe.test: $(OBJDIR)w_attach_mt_thread_tool$(PINTOOL_SUFFIX) $(OBJDIR)w_attach_mt_thread_app$(EXE_SUFFIX) $(OBJDIR)w_app_launcher2$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)callbacks_before_probe.log
+	$(OBJDIR)w_app_launcher2$(EXE_SUFFIX) $(OBJDIR)w_attach_mt_thread_app$(EXE_SUFFIX) > $(OBJDIR)callbacks_before_probe.log
+	$(PIN) -probe -pid `cat $(OBJDIR)callbacks_before_probe.log` -t $(OBJDIR)w_attach_mt_thread_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)callbacks_before_probe_tool.out
+	$(RM) -f $(OBJDIR)callbacks_before_probe.log
+
+launchReattachThreadDetachCallbacks.test: $(OBJDIR)launchReattachThreadDetachCallbacks_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) $(OBJDIR)reattachThreadDetachCallbacks_tool$(PINTOOL_SUFFIX)
+	$(SET_DLL_PATH) $(PIN) -t $(OBJDIR)reattachThreadDetachCallbacks_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)launchReattachThreadDetachCallbacks.out -- $(OBJDIR)launchReattachThreadDetachCallbacks_app$(EXE_SUFFIX) \
+	    $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX)
+	$(QGREP) PASSED $(OBJDIR)launchReattachThreadDetachCallbacks.out
+	$(CGREP) "Thread detach  notification at session 1" $(OBJDIR)launchReattachThreadDetachCallbacks.out | $(QGREP) 21
+	$(CGREP) "Thread start  notification at session 2" $(OBJDIR)launchReattachThreadDetachCallbacks.out | $(QGREP) 21
+	$(CGREP) "Thread detach  notification at session 2" $(OBJDIR)launchReattachThreadDetachCallbacks.out | $(QGREP) 21
+	$(RM) $(OBJDIR)launchReattachThreadDetachCallbacks.out
+
+attachReattachThreadDetachCallbacks.test: $(OBJDIR)attachReattachThreadDetachCallbacks_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) $(OBJDIR)reattachThreadDetachCallbacks_tool$(PINTOOL_SUFFIX)
+	$(SET_DLL_PATH) $(OBJDIR)attachReattachThreadDetachCallbacks_app$(EXE_SUFFIX) $(PIN) \
+	  -t $(OBJDIR)reattachThreadDetachCallbacks_tool$(PINTOOL_SUFFIX) $(OBJDIR)attachReattachThreadDetachCallbacks.out \
+	    $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX)
+	$(QGREP) PASSED $(OBJDIR)attachReattachThreadDetachCallbacks.out
+	$(CGREP) "Thread detach  notification at session 1" $(OBJDIR)attachReattachThreadDetachCallbacks.out | $(QGREP) 21
+	$(CGREP) "Thread start  notification at session 2" $(OBJDIR)attachReattachThreadDetachCallbacks.out | $(QGREP) 21
+	$(CGREP) "Thread detach  notification at session 2" $(OBJDIR)attachReattachThreadDetachCallbacks.out | $(QGREP) 21
+	$(RM) $(OBJDIR)attachReattachThreadDetachCallbacks.out
+
+launchReattachThreadDetachCallbacks_jit.test: $(OBJDIR)launchReattachThreadDetachCallbacks_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) $(OBJDIR)reattachThreadDetachCallbacks_jit_tool$(PINTOOL_SUFFIX)
+	$(SET_DLL_PATH) $(PIN) -t $(OBJDIR)reattachThreadDetachCallbacks_jit_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)launchReattachThreadDetachCallbacks_jit.out -- $(OBJDIR)launchReattachThreadDetachCallbacks_app$(EXE_SUFFIX) \
+	    $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX)
+	$(QGREP) PASSED $(OBJDIR)launchReattachThreadDetachCallbacks_jit.out
+	$(CGREP) "Thread detach  notification at session 1" $(OBJDIR)launchReattachThreadDetachCallbacks_jit.out | $(QGREP) 21
+	$(CGREP) "Thread start  notification at session 2" $(OBJDIR)launchReattachThreadDetachCallbacks_jit.out | $(QGREP) 21
+	$(CGREP) "Thread detach  notification at session 2" $(OBJDIR)launchReattachThreadDetachCallbacks_jit.out | $(QGREP) 21
+	$(RM) $(OBJDIR)launchReattachThreadDetachCallbacks_jit.out
+
+attachReattachThreadDetachCallbacks_jit.test: $(OBJDIR)attachReattachThreadDetachCallbacks_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX) $(OBJDIR)reattachThreadDetachCallbacks_jit_tool$(PINTOOL_SUFFIX)
+	$(SET_DLL_PATH) $(OBJDIR)attachReattachThreadDetachCallbacks_app$(EXE_SUFFIX) $(PIN) \
+	  -t $(OBJDIR)reattachThreadDetachCallbacks_jit_tool$(PINTOOL_SUFFIX) $(OBJDIR)attachReattachThreadDetachCallbacks_jit.out \
+	    $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX)
+	$(QGREP) PASSED $(OBJDIR)attachReattachThreadDetachCallbacks_jit.out
+	$(CGREP) "Thread detach  notification at session 1" $(OBJDIR)attachReattachThreadDetachCallbacks_jit.out | $(QGREP) 21
+	$(CGREP) "Thread start  notification at session 2" $(OBJDIR)attachReattachThreadDetachCallbacks_jit.out | $(QGREP) 21
+	$(CGREP) "Thread detach  notification at session 2" $(OBJDIR)attachReattachThreadDetachCallbacks_jit.out | $(QGREP) 21
+	$(RM) $(OBJDIR)attachReattachThreadDetachCallbacks_jit.out
+
+change_mask.test: $(OBJDIR)change_mask$(PINTOOL_SUFFIX) $(OBJDIR)change_mask_app$(EXE_SUFFIX)
+	$(OBJDIR)change_mask_app$(EXE_SUFFIX) $(OBJDIR)change_mask.out $(PIN) $(OBJDIR)change_mask$(PINTOOL_SUFFIX)
+	$(QGREP) -e '^22[12]1111111$$' $(OBJDIR)change_mask.out
+	$(RM) $(OBJDIR)change_mask.out
+
+auxv_query_jit.test: $(OBJDIR)attach_app$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) send_signals.sh
+	$(OBJDIR)attach_app$(EXE_SUFFIX) -pin $(PIN) -pinarg -logfile $(OBJDIR)$(@:.test=.pin.log) -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) \
+	    -just_auxv 1 -o $(OBJDIR)auxv_query_jit.tool.out
+	$(QGREP) "AT_ENTRY value:" $(OBJDIR)auxv_query_jit.tool.out
+	$(QGREP) "Could not find auxv value UNDEFINED_ENTRY" $(OBJDIR)auxv_query_jit.tool.out
+	$(RM) -f $(OBJDIR)auxv_query_jit.tool.out $(OBJDIR)$(@:.test=.pin.log)
+
+auxv_query_probe.test: $(OBJDIR)attach_app$(EXE_SUFFIX) $(OBJDIR)probe_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)attach_app$(EXE_SUFFIX) -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)probe_tool$(PINTOOL_SUFFIX) -just_auxv 1 -o $(OBJDIR)auxv_query_probe.out
+	$(QGREP) "AT_ENTRY value:" $(OBJDIR)auxv_query_probe.out
+	$(QGREP) "Could not find auxv value UNDEFINED_ENTRY" $(OBJDIR)auxv_query_probe.out
+	$(RM) $(OBJDIR)auxv_query_probe.out
+
+attach_removed_app.test: $(OBJDIR)attach_removed_app$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX)
+	$(eval TMPD := $(shell mktemp -d))
+	cp -f $(OBJDIR)attach_removed_app$(EXE_SUFFIX) $(TMPD)
+	$(TMPD)/attach_removed_app$(EXE_SUFFIX) -pin $(PIN) -pinarg -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)attach_removed_app.out > $(OBJDIR)attach_removed_app.log 2>&1
+	$(QGREP) "Fini was called" $(OBJDIR)attach_removed_app.out
+	$(QGREP) "After pause, Pin attached successfully" $(OBJDIR)attach_removed_app.log
+	$(RM) $(OBJDIR)attach_removed_app.out $(OBJDIR)attach_removed_app.log
+	rmdir $(TMPD)
+
+attach_removed_app_mac.test: $(OBJDIR)attach_removed_app$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX)
+	$(eval TMPD := $(shell mktemp -d -t attach_removed_app_mac))
+	cp -f $(OBJDIR)attach_removed_app$(EXE_SUFFIX) $(TMPD)
+	! ( $(TMPD)/attach_removed_app$(EXE_SUFFIX) -pin $(PIN) -pinarg -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)attach_removed_app.out > $(OBJDIR)attach_removed_app.log 2>&1 )
+	$(QGREP) "Application main image file doesn't exist or unreadable" $(OBJDIR)attach_removed_app.log
+	$(RM) $(OBJDIR)attach_removed_app.out $(OBJDIR)attach_removed_app.log
+	rmdir $(TMPD)
+
+attach_jit.test: $(OBJDIR)mt_attach$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) send_signals.sh
+	$(OBJDIR)mt_attach$(EXE_SUFFIX) -th_num 6 -pin $(PIN) -pinarg -logfile $(OBJDIR)$(@:.test=.pin.log) -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) \
+	  -check_order 1 -o $(OBJDIR)attach_jit.out
+	#check that all 6 threads are attached
+	$(GREP) "Thread counter" $(OBJDIR)attach_jit.out | $(QGREP) 6
+	$(RM) -f $(OBJDIR)attach_jit.out $(OBJDIR)$(@:.test=.pin.log)
+
+attach_thread_count_jit.test: $(OBJDIR)mt_attach$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)mt_attach$(EXE_SUFFIX) -th_num 6 -pin $(PIN) -pinarg -logfile $(OBJDIR)$(@:.test=.pin.log) -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)attach_thread_count_jit.out -just_init
+	#check that all 6 threads are attached
+	$(GREP) "Initial thread counter" $(OBJDIR)attach_thread_count_jit.out | $(QGREP) 6
+	$(RM) -f $(OBJDIR)attach_thread_count_jit.out $(OBJDIR)$(@:.test=.pin.log)
+attach_twice.test: $(OBJDIR)mt_attach$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) send_signals.sh
+	$(OBJDIR)mt_attach$(EXE_SUFFIX) -th_num 1 -attach_twice -pin $(PIN) -pinarg -logfile $(OBJDIR)attach_twice.log \
+	  -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)attach_twice.out
+	$(QGREP) "Pin is already attached" $(OBJDIR)attach_twice.log
+	$(RM) -f $(OBJDIR)attach_twice.out $(OBJDIR)attach_twice.log
+
+attach_mt_fini.test: $(OBJDIR)mt_attach$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) send_signals.sh
+	$(RM) -f $(OBJDIR)attach_mt_fini.out
+	$(OBJDIR)mt_attach$(EXE_SUFFIX) -th_num 2 -pin $(PIN) -keep_threads -pinarg -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)attach_mt_fini.out
+	#check Fini function was called
+	$(GREP) "Fini was called" $(OBJDIR)attach_mt_fini.out
+	$(RM) -f $(OBJDIR)attach_mt_fini.out
+
+attach_probe.test: $(OBJDIR)mt_attach$(EXE_SUFFIX) send_signals.sh $(OBJDIR)probe_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)mt_attach$(EXE_SUFFIX) -th_num 8 -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)probe_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)attach_probe.out
+	$(GREP) "Thread counter" $(OBJDIR)attach_probe.out | $(QGREP) 8
+	$(QGREP) "Application Start Callback" $(OBJDIR)attach_probe.out
+	$(RM) $(OBJDIR)attach_probe.out
+
+verify_sigmask_jit.test: $(OBJDIR)verify_sigmask$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) send_signals.sh
+	$(OBJDIR)verify_sigmask$(EXE_SUFFIX) -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)verify_sigmask_jit.out
+	$(RM) $(OBJDIR)verify_sigmask_jit.out
+
+short_func_instrumentation.test: $(OBJDIR)short_func_app$(EXE_SUFFIX) $(OBJDIR)short_func_tool$(PINTOOL_SUFFIX)
+	#start 20 threads
+	$(OBJDIR)short_func_app$(EXE_SUFFIX) -th_num 20 -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)short_func_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)short_func_instrumentation.out
+	$(RM) $(OBJDIR)short_func_instrumentation.out
+ 
+NUMBEROFTHREADS := 20
+
+check_blocking_real_time_signals.test: $(OBJDIR)check_blocking_real_time_signals_app$(EXE_SUFFIX) $(OBJDIR)check_blocking_real_time_signals_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)check_blocking_real_time_signals_app$(EXE_SUFFIX) -th_num $(NUMBEROFTHREADS) -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)check_blocking_real_time_signals_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)check_blocking_real_time_signals.out
+	$(RM) $(OBJDIR)check_blocking_real_time_signals.out    
+
+attach_and_execv.test: $(OBJDIR)mt_attach_and_execv$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)mt_attach_and_execv$(EXE_SUFFIX) -th_num 20 -pin $(PIN) -pinarg -follow_execv 1 \
+	  -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)attach_and_execv.out
+	$(RM) $(OBJDIR)attach_and_execv.out
+
+blocked_threads.test: $(OBJDIR)mt_blocked$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)mt_blocked$(EXE_SUFFIX) -pin $(PIN) -pinarg -xyzzy -mesgon log_fetch -logfile $(OBJDIR)blocked_threads.log \
+	  -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)blocked_threads.out
+	$(RM) $(OBJDIR)blocked_threads.log $(OBJDIR)blocked_threads.out
+
+detach.test: $(OBJDIR)mt_detach$(EXE_SUFFIX) $(OBJDIR)jit_detach_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)mt_detach$(EXE_SUFFIX) -th_num 7 -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)jit_detach_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)detach.out
+	$(RM) $(OBJDIR)detach.out
+
+instr_detach.test: $(OBJDIR)mt_thread$(EXE_SUFFIX) $(OBJDIR)jit_instr_detach$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)jit_instr_detach$(PINTOOL_SUFFIX) -o $(OBJDIR)instr_detach.out -- $(OBJDIR)mt_thread$(EXE_SUFFIX)
+	$(QGREP) "Pin detached after" $(OBJDIR)instr_detach.out
+	$(RM) $(OBJDIR)instr_detach.out
+
+anls_detach.test: $(OBJDIR)mt_thread$(EXE_SUFFIX) $(OBJDIR)jit_anls_detach$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)jit_anls_detach$(PINTOOL_SUFFIX) -o $(OBJDIR)anls_detach.out -- $(OBJDIR)mt_thread$(EXE_SUFFIX)
+	$(QGREP) "Pin detached after" $(OBJDIR)anls_detach.out
+	$(RM) $(OBJDIR)anls_detach.out
+
+tls_check_detach.test: $(OBJDIR)tls_app_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)detach_check_tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)detach_check_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)tls_check_detach_tool.out \
+	  -- $(OBJDIR)tls_app_$(TARGET_OS)$(EXE_SUFFIX) > $(OBJDIR)tls_check_detach.out 2>&1
+	$(QGREP) PASSED $(OBJDIR)tls_check_detach.out
+	$(RM) $(OBJDIR)tls_check_detach.out
+
+detach_check_sigmask.test: $(OBJDIR)detach_check_sigmask_app$(EXE_SUFFIX) $(OBJDIR)detach_check_tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)detach_check_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)detach_check_sigmask_tool.out \
+	  -- $(OBJDIR)detach_check_sigmask_app$(EXE_SUFFIX) > $(OBJDIR)detach_check_sigmask.out 2>&1
+	$(QGREP) PASSED $(OBJDIR)detach_check_sigmask.out
+	$(RM) $(OBJDIR)detach_check_sigmask.out
+
+tls_check_detach_probe.test: $(OBJDIR)tls_app_$(TARGET_OS)$(EXE_SUFFIX) $(OBJDIR)detach_check_tool$(PINTOOL_SUFFIX)
+	$(PIN) -probe -t $(OBJDIR)detach_check_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)tls_check_detach_probe_tool.out \
+	  -- $(OBJDIR)tls_app_$(TARGET_OS)$(EXE_SUFFIX) > $(OBJDIR)tls_check_detach_probe.out 2>&1
+	$(QGREP) PASSED $(OBJDIR)tls_check_detach_probe.out
+	$(RM) $(OBJDIR)tls_check_detach_probe.out
+
+tls_check_attach_detach.test: $(OBJDIR)tls_attach_detach_app_mac$(EXE_SUFFIX) $(OBJDIR)detach_check_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)tls_attach_detach_app_mac$(EXE_SUFFIX) -pin $(PIN) -pinarg -t $(OBJDIR)detach_check_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)tls_check_attach_detach_tool.out
+
+tls_check_attach_detach_probe.test: $(OBJDIR)tls_attach_detach_app_mac$(EXE_SUFFIX) $(OBJDIR)detach_check_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)tls_attach_detach_app_mac$(EXE_SUFFIX) -pin $(PIN) -pinarg -probe -t $(OBJDIR)detach_check_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)tls_check_attach_detach_probe_tool.out
+
+verify_fpstate.test: $(OBJDIR)verify_fpstate_app$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)verify_fpstate_app$(EXE_SUFFIX) -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)verify_fpstate.out
+	$(RM) $(OBJDIR)verify_fpstate.out
+
+detach_probed.test: $(OBJDIR)detach_probed_app$(EXE_SUFFIX) $(OBJDIR)detach_probed_tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)detach_probed_tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)detach_probed_app$(EXE_SUFFIX) > $(OBJDIR)detach_probed.out
+	$(QGREP) PASSED $(OBJDIR)detach_probed.out
+	$(RM) $(OBJDIR)detach_probed.out
+
+detach_probed_wait_child.test: $(OBJDIR)detach_probed_wait_child_app$(EXE_SUFFIX) $(OBJDIR)detach_probed_tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)detach_probed_tool$(PINTOOL_SUFFIX) -- $(OBJDIR)detach_probed_wait_child_app$(EXE_SUFFIX)
+
+detach_probed_wait_child_with_replace_signature.test: $(OBJDIR)detach_probed_wait_child_app$(EXE_SUFFIX) $(OBJDIR)detach_probed_tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)detach_probed_tool$(PINTOOL_SUFFIX) -replace_signature_probed 1 -- $(OBJDIR)detach_probed_wait_child_app$(EXE_SUFFIX)
+
+reattach_probed.test: $(OBJDIR)reattach_probed_app$(EXE_SUFFIX) $(OBJDIR)reattach_probed_tool$(PINTOOL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX)
+	$(SET_DLL_PATH) $(PIN) -t $(OBJDIR)reattach_probed_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)reattach_probed_tool.out \
+	    -- $(OBJDIR)reattach_probed_app$(EXE_SUFFIX)
+	$(QGREP) PASSED $(OBJDIR)reattach_probed_tool.out
+	$(RM) $(OBJDIR)reattach_probed_tool.out
+
+reattach_jit.test: $(OBJDIR)reattach_jit_app$(EXE_SUFFIX) $(OBJDIR)reattach_jit_tool$(PINTOOL_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX)
+	$(SET_DLL_PATH) $(PIN) -t $(OBJDIR)reattach_jit_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)reattach_jit.out \
+	    -- $(OBJDIR)reattach_jit_app$(EXE_SUFFIX)
+	$(QGREP) PASSED $(OBJDIR)reattach_jit.out
+	$(RM) $(OBJDIR)reattach_jit.out
+
+reattach_verify_sigmask.test: $(OBJDIR)reattach_verify_sigmask_app$(EXE_SUFFIX) $(OBJDIR)reattach_probed_tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)reattach_probed_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)reattach_verify_sigmask.out \
+	  -- $(OBJDIR)reattach_verify_sigmask_app$(EXE_SUFFIX)
+	$(QGREP) PASSED $(OBJDIR)reattach_verify_sigmask.out
+	$(RM) $(OBJDIR)reattach_verify_sigmask.out
+
+reattach_jit_verify_sigmask.test: $(OBJDIR)reattach_verify_sigmask_app$(EXE_SUFFIX) $(OBJDIR)reattach_jit_tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)reattach_jit_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)reattach_jit_verify_sigmask.out \
+	  -- $(OBJDIR)reattach_verify_sigmask_app$(EXE_SUFFIX)
+	$(QGREP) PASSED $(OBJDIR)reattach_jit_verify_sigmask.out
+	$(RM) $(OBJDIR)reattach_jit_verify_sigmask.out
+
+reattach_read_write.test: $(OBJDIR)read_write_app$(EXE_SUFFIX) $(OBJDIR)reattach_probed_tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)reattach_probed_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)reattach_read_write.out \
+	  -- $(OBJDIR)read_write_app$(EXE_SUFFIX)
+	$(QGREP) PASSED $(OBJDIR)reattach_read_write.out
+	$(RM) $(OBJDIR)reattach_read_write.out
+
+reattach_jit_read_write.test: $(OBJDIR)read_write_app$(EXE_SUFFIX) $(OBJDIR)reattach_jit_tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)reattach_jit_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)reattach_jit_read_write.out \
+	  -- $(OBJDIR)read_write_app$(EXE_SUFFIX)
+	$(QGREP) PASSED $(OBJDIR)reattach_jit_read_write.out
+	$(RM) $(OBJDIR)reattach_jit_read_write.out
+
+reattach_fork.test: $(OBJDIR)mt_fork_app$(EXE_SUFFIX) $(OBJDIR)my_exe$(EXE_SUFFIX) $(OBJDIR)reattach_probed_tool$(PINTOOL_SUFFIX)
+	$(PIN) -follow_execv -t $(OBJDIR)reattach_probed_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)reattach_fork.out -uniq \
+	  -- $(OBJDIR)mt_fork_app$(EXE_SUFFIX)
+	$(QGREP) PASSED `$(GREP) -l mt_fork_app $(OBJDIR)reattach_fork.out*`
+	$(RM) $(OBJDIR)reattach_fork.out*
+
+reattach_jit_fork.test: $(OBJDIR)mt_fork_app$(EXE_SUFFIX) $(OBJDIR)my_exe$(EXE_SUFFIX) $(OBJDIR)reattach_jit_tool$(PINTOOL_SUFFIX)
+	$(PIN) -follow_execv -t $(OBJDIR)reattach_jit_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)reattach_jit_fork.out -uniq \
+	  -- $(OBJDIR)mt_fork_app$(EXE_SUFFIX)
+	$(QGREP) PASSED `$(GREP) -l mt_fork_app $(OBJDIR)reattach_jit_fork.out*`
+	$(RM) $(OBJDIR)reattach_jit_fork.out*
+
+attach_in_sighandler.test: $(OBJDIR)attach_in_sighandler_app$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)attach_in_sighandler_app$(EXE_SUFFIX) -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)attach_in_sighandler.log > $(OBJDIR)attach_in_sighandler.out 2>&1
+	$(QGREP) "xmm values are correct" $(OBJDIR)attach_in_sighandler.out
+	$(RM) $(OBJDIR)attach_in_sighandler.log $(OBJDIR)attach_in_sighandler.out
+
+attach_in_sighandler1.test: $(OBJDIR)attach_in_sighandler_app$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)attach_in_sighandler_app$(EXE_SUFFIX) -test 1 -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)attach_in_sighandler1.log \
+	    > $(OBJDIR)attach_in_sighandler1.out 2>&1
+	$(QGREP) "xmm values are correct" $(OBJDIR)attach_in_sighandler1.out
+	$(RM) $(OBJDIR)attach_in_sighandler1.out $(OBJDIR)attach_in_sighandler1.log
+
+detach_in_sighandler.test: $(OBJDIR)detach_in_sighandler_app$(EXE_SUFFIX) $(OBJDIR)jit_detach_tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)jit_detach_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)detach_in_sighandler.log \
+	  -- $(OBJDIR)detach_in_sighandler_app$(EXE_SUFFIX) > $(OBJDIR)detach_in_sighandler.out 2>&1
+	$(QGREP) "xmm values are correct" $(OBJDIR)detach_in_sighandler.out
+	$(RM) $(OBJDIR)detach_in_sighandler.out $(OBJDIR)detach_in_sighandler.log
+
+detach_in_sighandler1.test: $(OBJDIR)detach_in_sighandler_app$(EXE_SUFFIX) $(OBJDIR)jit_detach_tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)jit_detach_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)detach_in_sighandler1.log \
+	  -- $(OBJDIR)detach_in_sighandler_app$(EXE_SUFFIX) -test 1 > $(OBJDIR)detach_in_sighandler1.out 2>&1
+	$(QGREP) "xmm values are correct" $(OBJDIR)detach_in_sighandler1.out
+	$(RM) $(OBJDIR)detach_in_sighandler1.out $(OBJDIR)detach_in_sighandler1.log
+
+pause_msg.test: $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) $(OBJDIR)pause_msg_app$(EXE_SUFFIX)
+	$(OBJDIR)pause_msg_app$(EXE_SUFFIX) -pin $(PIN) -pinarg -pause_tool 1 \
+	  -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) -o $(OBJDIR)pause_msg.log > $(OBJDIR)pause_msg.out 2>&1
+	$(QGREP) "Pausing for 1 seconds to attach" $(OBJDIR)pause_msg.out
+	$(QGREP) "Resuming" $(OBJDIR)pause_msg.out
+	$(RM) $(OBJDIR)pause_msg.out $(OBJDIR)pause_msg.log
+
+# use hello_world as simple application that writes somthing to standard output (the test makes sure pause msg is not overwritten)
+pause_msg1.test: $(OBJDIR)simple_tool$(PINTOOL_SUFFIX)  $(HELLO_APP)
+	$(PIN) -pause_tool 1 -t $< -- $(HELLO_APP) > $(OBJDIR)pause_msg1.out 2>&1
+	$(QGREP) "Pausing for 1 seconds to attach" $(OBJDIR)pause_msg1.out
+	$(QGREP) "Resuming" $(OBJDIR)pause_msg1.out
+	$(RM) $(OBJDIR)pause_msg1.out
+
+pause_msg_log.test: $(OBJDIR)simple_tool$(PINTOOL_SUFFIX) $(HELLO_APP)
+	$(PIN) -pause_tool 1 -logfile $(OBJDIR)unique1.log -t  $(OBJDIR)simple_tool$(PINTOOL_SUFFIX) \
+	 -- $(HELLO_APP) > $(OBJDIR)pause_msg_log1.log 2>&1
+	$(PIN) -xyzzy -pause 1 -logfile $(OBJDIR)unique2.log -- $(HELLO_APP) >> $(OBJDIR)pause_msg_log2.log 2>&1
+	$(QGREP) "Pausing for 1 seconds to attach" $(OBJDIR)unique1.log
+	$(QGREP) "Pausing for 1 seconds to attach" $(OBJDIR)unique2.log
+	$(RM) $(OBJDIR)unique*.log $(OBJDIR)pause_msg_log*.log
+
+thread_order.test: $(OBJDIR)threadOrder$(EXE_SUFFIX) $(OBJDIR)threadOrder_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)threadOrder$(EXE_SUFFIX) $(PIN) -t $(OBJDIR)threadOrder_tool$(PINTOOL_SUFFIX)
+	$(CMP) threadOrder_master.out threadOrder_generated.out
+	$(RM) threadOrder_master.out threadOrder_generated.out
+
+attach_denied.test:
+	-$(PIN) -pid 1 -error_file $(OBJDIR)attach_denied.out
+	$(QGREP) "Could not attach to process" $(OBJDIR)attach_denied.out
+	$(RM) $(OBJDIR)attach_denied.out
+
+zombie_main_thread_command_line_attach.test: $(OBJDIR)main_command_line_app$(EXE_SUFFIX) $(OBJDIR)reattach_probed_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)main_command_line_app$(EXE_SUFFIX) $(PIN) -t $(OBJDIR)reattach_probed_tool$(PINTOOL_SUFFIX) \
+	  $(OBJDIR)zombie_main_thread_command_line_attach.out > $(OBJDIR)zombie_main_thread_command_line_attach.out
+	$(QGREP) "The main thread of the application is a zombie thread. Pin can't attach to an application which its main thread is a zombie thread" \
+	  $(OBJDIR)zombie_main_thread_command_line_attach.out
+	$(RM) $(OBJDIR)zombie_main_thread_command_line_attach.out
+
+zombie_main_thread_api_attach.test: $(OBJDIR)main_attach_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)reattachZombie_tool$(PINTOOL_SUFFIX)
+	-$(OBJDIR)main_attach_app$(EXE_SUFFIX) $(PIN) -t $(OBJDIR)reattachZombie_tool$(PINTOOL_SUFFIX) \
+	  $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)zombie_main_thread_api_attach.out > $(OBJDIR)zombie_main_thread_api_attach.out
+	@# Sleep for 3 seconds in order to prevent a scenario where the grep command is executed before the error
+	@# message is written into the log file.
+	sleep 3
+	$(QGREP) "The main thread of the application is a zombie thread. Pin can't attach to an application which its main thread is a zombie thread" \
+      $(OBJDIR)zombie_main_thread_api_attach.out
+	$(RM) $(OBJDIR)zombie_main_thread_api_attach.out
+
+zombie_secondary_thread_api_attach.test: $(OBJDIR)secondary_attach_app$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)reattachZombie_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)secondary_attach_app$(EXE_SUFFIX) $(PIN) -t $(OBJDIR)reattachZombie_tool$(PINTOOL_SUFFIX) \
+	  $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)zombie_secondary_thread_api_attach.out \
+	    > $(OBJDIR)zombie_secondary_thread_api_attach.out
+	$(QGREP) PASSED $(OBJDIR)zombie_secondary_thread_api_attach.out
+	$(RM) $(OBJDIR)zombie_secondary_thread_api_attach.out
+
+zombie_secondary_thread_command_line_attach.test: $(OBJDIR)secondary_command_line_app$(EXE_SUFFIX) $(OBJDIR)reattach_probed_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)secondary_command_line_app$(EXE_SUFFIX) $(PIN) -t $(OBJDIR)reattach_probed_tool$(PINTOOL_SUFFIX) \
+	  $(OBJDIR)zombie_secondary_thread_command_line_attach.out > $(OBJDIR)zombie_secondary_thread_command_line_attach.out
+	$(QGREP) PASSED $(OBJDIR)zombie_secondary_thread_command_line_attach.out
+	$(RM) $(OBJDIR)zombie_secondary_thread_command_line_attach.out
+
+detach_syscall.test: $(OBJDIR)detach_syscall_app$(EXE_SUFFIX) $(OBJDIR)detach_syscall$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)detach_syscall$(PINTOOL_SUFFIX) -- $(OBJDIR)detach_syscall_app$(EXE_SUFFIX) \
+	  > $(OBJDIR)detach_syscall.out 2>&1
+	$(QGREP) "Application finished successfully!" $(OBJDIR)detach_syscall.out
+	$(RM) $(OBJDIR)detach_syscall.out
+
+tool_relative_path.test: $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) $(OBJDIR)chdir_app$(EXE_SUFFIX)
+	$(OBJDIR)chdir_app$(EXE_SUFFIX) -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) -o obj-$(TARGET)__tool_relative_path.log > $(OBJDIR)tool_relative_path.out 2>&1
+	$(QGREP) "Fini was called" ../obj-$(TARGET)__tool_relative_path.log
+	$(RM) -f $(OBJDIR)tool_relative_path.out ../obj-$(TARGET)__tool_relative_path.log
+
+w_simple_attach_tool.test: $(OBJDIR)w_simple_attach_tool$(PINTOOL_SUFFIX) $(OBJDIR)w_simple_app$(EXE_SUFFIX) $(OBJDIR)w_app_launcher$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)pid_simple.log
+	$(OBJDIR)w_app_launcher$(EXE_SUFFIX) $(OBJDIR)w_simple_app$(EXE_SUFFIX) > $(OBJDIR)pid_simple.log 2>&1
+	$(PIN) -detach_reattach -probe -pid `cat $(OBJDIR)pid_simple.log` -t $(OBJDIR)w_simple_attach_tool$(PINTOOL_SUFFIX)
+	$(QGREP) rep_FirstProbeInvoked $(OBJDIR)pid_simple.log
+	$(QGREP) rep_SecondProbeInvoked $(OBJDIR)pid_simple.log
+	$(QGREP) "Test passed!" $(OBJDIR)pid_simple.log
+	$(RM) -f $(OBJDIR)pid_simple.log
+
+attach_and_create_thread.test: $(OBJDIR)attach_app$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)attach_app$(EXE_SUFFIX) -secondary-threads 3 -pin $(PIN) -pinarg -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) \
+	    -o $(OBJDIR)attach_and_create_thread.out
+	$(BASHTEST) `$(GREP) "MyThreadMain called with " $(OBJDIR)attach_and_create_thread.out | $(LINECOUNT)` -eq 3
+	$(RM) -f $(OBJDIR)attach_and_create_thread.out
+
+attach_on_select.test: $(OBJDIR)mt_attach$(EXE_SUFFIX) $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) send_signals.sh
+	$(OBJDIR)mt_attach$(EXE_SUFFIX) -th_num 10 -endless_select -pin $(PIN) -pinarg -logfile $(OBJDIR)$(@:.test=.pin.log) -t $(OBJDIR)jit_tool$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)attach_on_select.out
+	#check that all 10 threads are attached
+	$(GREP) "Thread counter" $(OBJDIR)attach_on_select.out | $(QGREP) 10
+	$(RM) -f $(OBJDIR)attach_on_select.out $(OBJDIR)$(@:.test=.pin.log)
+
+read_stdin.test: $(OBJDIR)read_stdin$(PINTOOL_SUFFIX) $(OBJDIR)read_stdin_app$(EXE_SUFFIX) attach_read_stdin.py
+	$(PYTHON) attach_read_stdin.py $(OBJDIR)read_stdin_app$(EXE_SUFFIX) $(PIN) -t $(OBJDIR)read_stdin$(PINTOOL_SUFFIX) > $(OBJDIR)read_stdin.out
+	$(QGREP) "App exited" $(OBJDIR)read_stdin.out
+	$(QGREP) "Tool start" $(OBJDIR)read_stdin.out
+	$(QGREP) "App Success!" $(OBJDIR)read_stdin.out
+	$(QGREP) "Tool success!" $(OBJDIR)read_stdin.out
+	$(RM) -f $(OBJDIR)read_stdin.out
+
+ld_linux_attach.test: $(OBJDIR)ld_linux_attach$(PINTOOL_SUFFIX) $(OBJDIR)ld_linux_attach_app$(EXE_SUFFIX)
+ifeq ($(TARGET),intel64)
+	/lib64/ld-linux-x86-64.so.2 $(OBJDIR)ld_linux_attach_app$(EXE_SUFFIX) -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)ld_linux_attach$(PINTOOL_SUFFIX) > $(OBJDIR)ld_linux_attach.out 2>&1
+else
+	/lib/ld-linux.so.2 $(OBJDIR)ld_linux_attach_app$(EXE_SUFFIX) -pin $(PIN) -pinarg \
+	  -t $(OBJDIR)ld_linux_attach$(PINTOOL_SUFFIX) > $(OBJDIR)ld_linux_attach.out 2>&1
+endif
+	$(SED) -i "/\b\ld_linux_attach_app\b/d" $(OBJDIR)ld_linux_attach.out
+	ldd $(OBJDIR)ld_linux_attach_app$(EXE_SUFFIX) | $(GREP) -v "linux-gate" | $(GREP) -v "linux-vdso" | \
+	  $(AWK) '{print $$1}' | $(SED) 's/^.*\/\([^\/]*\)$$/\1/' > $(OBJDIR)ldd.out
+	$(SORT) -o $(OBJDIR)ld_linux_attach.out $(OBJDIR)ld_linux_attach.out
+	$(SORT) -o $(OBJDIR)ldd.out $(OBJDIR)ldd.out
+	$(DIFF) $(OBJDIR)ld_linux_attach.out $(OBJDIR)ldd.out
+	$(RM) $(OBJDIR)ld_linux_attach.out $(OBJDIR)ldd.out
+
+# Check extended state is restored correctly after detach which occurred inside analysis function which was called after a 
+# native instruction which did some operation on XMM register
+detach_check_extended_state1.test: $(OBJDIR)detach_after_addss$(PINTOOL_SUFFIX) $(OBJDIR)add_floats$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)detach_after_addss$(PINTOOL_SUFFIX) -o $(OBJDIR)detach_check_extended_state1_tool.out -- $(OBJDIR)add_floats$(EXE_SUFFIX) > $(OBJDIR)detach_check_extended_state1.out 2>&1
+	if $(GREP) "addss" $(OBJDIR)detach_check_extended_state1_tool.out ; then \
+	  $(GREP) "ret 1: 3.000000" $(OBJDIR)detach_check_extended_state1.out;   \
+	fi
+	$(RM) $(OBJDIR)detach_check_extended_state1_tool.out
+
+# Check extended state is restored correctly after detach which occurred inside analysis function which was called after a 
+# native instruction which did some operation on XMM register, also in this case we manipultae the appiclation XMM register,
+# so we expect that the up-to-date value will lay in the XMM register after detach 
+detach_check_extended_state2.test: $(OBJDIR)detach_after_addss$(PINTOOL_SUFFIX) $(OBJDIR)add_floats$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)detach_after_addss$(PINTOOL_SUFFIX) -o $(OBJDIR)detach_check_extended_state2_tool.out -change_bit 1 -- $(OBJDIR)add_floats$(EXE_SUFFIX) > $(OBJDIR)detach_check_extended_state2.out 2>&1
+	if $(GREP) "addss" $(OBJDIR)detach_check_extended_state2_tool.out ; then \
+	  $(GREP) "ret 1: 3.000977" $(OBJDIR)detach_check_extended_state2.out;   \
+	fi
+	$(RM) $(OBJDIR)detach_check_extended_state2_tool.out $(OBJDIR)detach_check_extended_state2.out
+
+# Check extended state is restored correctly after detach which occurred inside analysis function which scramabled XMM
+# registers but not the the native XMM registers (shouldn't effect application)
+# detach_check_extended_state3 uses SSE 4.1 (PINSR*). This test is filtered out on sanity & nightly on machines with 
+# no AVX support (although it can be run on machines that support SSE 4.1) .
+detach_check_extended_state3.test: $(OBJDIR)check_xmms_tool$(PINTOOL_SUFFIX) $(OBJDIR)check_xmms_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)check_xmms_tool$(PINTOOL_SUFFIX) -- $(OBJDIR)check_xmms_app$(EXE_SUFFIX)
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special tools' build rules ######
+
+$(OBJDIR)reattachZombie_tool$(PINTOOL_SUFFIX): $(OBJDIR)reattachZombie_tool$(OBJ_SUFFIX) $(OBJDIR)zombie_utils_tool$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)check_xmms_tool$(PINTOOL_SUFFIX): $(OBJDIR)check_xmms_tool$(OBJ_SUFFIX) $(OBJDIR)check_xmms_asm$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+
+###### Special applications' build rules ######
+
+$(OBJDIR)main_attach_app$(EXE_SUFFIX): main_attach_app.cpp $(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX) $(OBJDIR)zombie_utils$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(OBJDIR)zombie_utils$(OBJ_SUFFIX) \
+	  $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LIBS)
+
+$(OBJDIR)w_app1$(EXE_SUFFIX): w_app1.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)w_simple_app$(EXE_SUFFIX): w_simple_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)w_app2$(EXE_SUFFIX): w_app2.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)w_app3$(EXE_SUFFIX): w_app3.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)w_app4$(EXE_SUFFIX): w_app4.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)w_attach_mt_thread_app$(EXE_SUFFIX): w_attach_mt_thread_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)w_service_app1$(EXE_SUFFIX): w_service_app1.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) advapi32.lib
+
+$(OBJDIR)w_app_launcher$(EXE_SUFFIX): w_app_launcher.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)w_app_launcher2$(EXE_SUFFIX): w_app_launcher2.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)chdir_app$(EXE_SUFFIX): chdir_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)w_pin_service_launcher$(EXE_SUFFIX): w_pin_service_launcher.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) advapi32.lib
+
+$(OBJDIR)verify_sigmask$(EXE_SUFFIX): verify_sigmask.cpp $(THREADLIB)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)mt_attach$(EXE_SUFFIX): mt_attach.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)mt_blocked$(EXE_SUFFIX): mt_blocked.cpp $(THREADLIB)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)mt_attach_and_execv$(EXE_SUFFIX): mt_attach_and_execv.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)short_func_app$(EXE_SUFFIX): short_func_app.cpp short_func_$(TARGET)$(ASM_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+  
+$(OBJDIR)check_blocking_real_time_signals_app$(EXE_SUFFIX): check_blocking_real_time_signals_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)mt_detach$(EXE_SUFFIX): mt_detach.cpp $(THREADLIB)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)detach_probed_app$(EXE_SUFFIX): detach_probed_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)detach_probed_wait_child_app$(EXE_SUFFIX): detach_probed_wait_child_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)reattach_probed_app$(EXE_SUFFIX): reattach_probed_app.cpp $(THREADLIB)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)reattach_verify_sigmask_app$(EXE_SUFFIX): reattach_verify_sigmask_app.cpp $(THREADLIB)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)change_mask_app$(EXE_SUFFIX): change_mask_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)read_write_app$(EXE_SUFFIX): read_write_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)my_exe$(EXE_SUFFIX): my_exe.c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)mt_fork_app$(EXE_SUFFIX): mt_fork_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)mt_thread$(EXE_SUFFIX): mt_thread.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)tls_app_linux$(EXE_SUFFIX): tls_app_$(TARGET).cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)tls_app_mac$(EXE_SUFFIX): tls_app_mac.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)tls_attach_detach_app_mac$(EXE_SUFFIX): tls_attach_detach_app_mac.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)verify_fpstate_app$(EXE_SUFFIX): verify_fpstate_app.cpp $(OBJDIR)fp_save_restore$(OBJ_SUFFIX) $(THREADLIB)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)attach_in_sighandler_app$(EXE_SUFFIX): attach_in_sighandler_app.cpp $(OBJDIR)fp_save_restore$(OBJ_SUFFIX) $(THREADLIB)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)detach_in_sighandler_app$(EXE_SUFFIX): detach_in_sighandler_app.cpp $(OBJDIR)fp_save_restore$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)pause_msg_app$(EXE_SUFFIX): pause_msg_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)threadOrder$(EXE_SUFFIX): threadOrder.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)launchReattachThreadDetachCallbacks_app$(EXE_SUFFIX): launchReattachThreadDetachCallbacks_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)attachReattachThreadDetachCallbacks_app$(EXE_SUFFIX): attachReattachThreadDetachCallbacks_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)main_command_line_app$(EXE_SUFFIX): main_command_line_app.cpp zombie_utils.h $(OBJDIR)zombie_utils$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $(^:%.h=) $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)secondary_command_line_app$(EXE_SUFFIX): secondary_command_line_app.cpp zombie_utils.h $(OBJDIR)zombie_utils$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $(^:%.h=) $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)secondary_attach_app$(EXE_SUFFIX): secondary_attach_app.cpp zombie_utils.h $(OBJDIR)zombie_utils$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $(^:%.h=) $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)attach_app$(EXE_SUFFIX): attach_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)attach_removed_app$(EXE_SUFFIX): attach_removed_app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)reattach_jit_app$(EXE_SUFFIX): reattach_jit_app.cpp $(THREADLIB)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)detach_check_sigmask_app$(EXE_SUFFIX): detach_check_sigmask_app.cpp $(THREADLIB)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)check_xmms_app$(EXE_SUFFIX): check_xmms_app.c $(OBJDIR)check_xmms_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(DBG_INFO_LD_ALWAYS)
+
+###### Special objects' build rules ######
+
+$(OBJDIR)zombie_utils$(OBJ_SUFFIX): zombie_utils.cpp zombie_utils.h
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(PIC) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)zombie_utils_tool$(OBJ_SUFFIX): zombie_utils.cpp zombie_utils.h
+	$(CXX) $(TOOL_CXXFLAGS_NOOPT) $(PIC) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)my_dll$(OBJ_SUFFIX): my_dll.c
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)add_floats$(EXE_SUFFIX): add_floats.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+###### Special dlls' build rules ######
+
+$(OBJDIR)$(DLL_PREFIX)my_dll$(DLL_SUFFIX): $(OBJDIR)my_dll$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)$(DLL_PREFIX)my_dll_1$(DLL_SUFFIX): $(OBJDIR)my_dll$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)

@@ -1,0 +1,6 @@
+\S*DoASSERT\S*\+0x[0-9a-f]+ at \S*pin_backtrace_on_assert\.(so|dylib)\+0x[0-9a-f]+
+\S*Bar\S*\+0x[0-9a-f]+ at \S*pin_backtrace_on_assert\.(so|dylib)\+0x[0-9a-f]+
+\S*Foo\S*\+0x[0-9a-f]+ at \S*pin_backtrace_on_assert\.(so|dylib)\+0x[0-9a-f]+
+\S*Instruction\S*\+0x[0-9a-f]+ at \S*pin_backtrace_on_assert\.(so|dylib)\+0x[0-9a-f]+
+\S*CallTraceCallbacks\S*\+0x[0-9a-f]+ at \S*pin_backtrace_on_assert\.(so|dylib)\+0x[0-9a-f]+
+\S*RecordInstrumentation\S*\+0x[0-9a-f]+ at \S*pinbin\+0x[0-9a-f]+

@@ -1,0 +1,10 @@
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+Focus thread is .*
+Program exited with 0

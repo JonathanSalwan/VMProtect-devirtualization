@@ -1,0 +1,397 @@
+#
+# Copyright (C) 2013-2021 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := context_regvalue change_context_regvalue change_context_rflags emu_context_regvalue context_perf \
+                   iarg_reg_reference iarg_reg_reference_flags fptag_conversion
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS := const_context_regvalue partial_context_regvalue change_partial_context_regvalue \
+              change_partial_context_rflags iarg_reg_const_reference \
+              xstateComponentX87_context xstateComponentX87_partial \
+              xstateComponentSSE_context xstateComponentSSE_partial xstateComponentSSE_reference \
+              xstateComponentAVX_context xstateComponentAVX_partial xstateComponentAVX_reference \
+              xsave_memorywrite_ea xsave_memoryXXX_size_IPBEFORE xsave_memoryXXX_size_IPAFTER\
+              xsave_memoryXXX_size_IPBEFORE_ifthen xsave_memoryXXX_size_IPAFTER_ifthen
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS := checkXStateBV_tool xsave_iarg_mem
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := regvalue_app checkXStateBV_app xsave_iarg_mem_app print_flags fptag_conversion_app
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS := regvalues changeRegs regvalue_test_utils context_utils register_modification_utils doXsave print_flags_asm fptag_conversion_app fptag_conversion
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Handle exceptions here (OS/arch related) ######
+
+# If there are avx-dependent targets, make sure that the isa check programs exist.
+ifneq ($(TARGET_HAS_DEPENDENCIES),)
+    ifeq ($(wildcard $(CHECKAVX)),)
+        $(error Unable to proceed. Run "make avxcheck", then try again)
+    endif
+    ifeq ($(wildcard $(CHECKAVX512F)),)
+        $(error Unable to proceed. Run "make avx512fcheck", then try again)
+    endif
+
+    MACHINE_SUPPORTS_AVX_INSTRUCTIONS := $(shell $(CHECKAVX) | $(GREP) Yes)
+    MACHINE_SUPPORTS_AVX512F_INSTRUCTIONS := $(shell $(CHECKAVX512F) | $(GREP) Yes)
+    ifneq ($(MACHINE_SUPPORTS_AVX_INSTRUCTIONS),Yes)
+        TEST_ROOTS := $(filter-out xstateComponentX87_context xstateComponentX87_partial xstateComponentSSE_context \
+                                   xstateComponentSSE_partial xstateComponentSSE_reference xstateComponentAVX_context \
+                                   xstateComponentAVX_partial xstateComponentAVX_reference xsave_memorywrite_ea \
+                                   xsave_memoryXXX_size_IPBEFORE xsave_memoryXXX_size_IPAFTER \
+                                   xsavec_memoryXXX_size_IPBEFORE xsavec_memoryXXX_size_IPAFTER \
+                                   xsave_memoryXXX_size_IPBEFORE_ifthen xsave_memoryXXX_size_IPAFTER_ifthen, $(TEST_ROOTS))
+        TOOL_ROOTS := $(filter-out checkXStateBV_tool xsave_iarg_mem, $(TOOL_ROOTS))
+        APP_ROOTS := $(filter-out checkXStateBV_app xsave_iarg_mem_app, $(APP_ROOTS))
+        OBJECT_ROOTS := $(filter-out doXsave, $(OBJECT_ROOTS))
+    endif
+endif
+
+# binutils older than 2.21 does not support avx512, disable these tests.
+ifeq ($(MACHINE_SUPPORTS_AVX_INSTRUCTIONS),Yes)
+    COMPILER_SUPPORTS_AVX = 1
+    ifeq ($(TARGET_OS),linux)
+        ASSEMBLER_LT_2_21 := $(shell $(TOOLS_ROOT)/Utils/testToolVersion `which as` lt 2.21)
+        ifeq ($(ASSEMBLER_LT_2_21),1)
+            COMPILER_SUPPORTS_AVX = 0
+        endif
+    endif
+    ifeq ($(COMPILER_SUPPORTS_AVX), 0)
+        TEST_TOOL_ROOTS := $(filter-out context_regvalue change_context_regvalue change_context_rflags context_perf \
+                                        emu_context_regvalue iarg_reg_reference , $(TEST_TOOL_ROOTS))
+        TEST_ROOTS := $(filter-out const_context_regvalue partial_context_regvalue change_partial_context_regvalue \
+                                   change_partial_context_rflags iarg_reg_const_reference, $(TEST_ROOTS))
+        APP_ROOTS := $(filter-out regvalue_app, $(APP_ROOTS))
+        OBJECT_ROOTS := $(filter-out changeRegs, $(OBJECT_ROOTS))
+    endif
+endif
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+# See Mantis 4788 for change_context_rflags
+ifeq ($(TARGET_OS),windows)
+    TEST_TOOL_ROOTS := $(filter-out change_context_rflags, $(TEST_TOOL_ROOTS))
+endif
+ifeq ($(TARGET_OS),mac)
+    TEST_TOOL_ROOTS := $(filter-out change_context_rflags, $(TEST_TOOL_ROOTS))
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+context_regvalue.test: $(OBJDIR)context_regvalue$(PINTOOL_SUFFIX) $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $< -o $(OBJDIR)$(@:%.test=%.out) -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+const_context_regvalue.test: $(OBJDIR)context_regvalue$(PINTOOL_SUFFIX) $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $< -testcontext const -o $(OBJDIR)$(@:%.test=%.out) -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+partial_context_regvalue.test: $(OBJDIR)context_regvalue$(PINTOOL_SUFFIX) $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $< -testcontext partial -o $(OBJDIR)$(@:%.test=%.out) -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+change_context_regvalue.test: $(OBJDIR)change_context_regvalue$(PINTOOL_SUFFIX) $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $< -test_partial 0 -o $(OBJDIR)$(@:%.test=%.out) -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+change_partial_context_regvalue.test: $(OBJDIR)change_context_regvalue$(PINTOOL_SUFFIX) $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $< -testcontext partial -test_partial 0 -o $(OBJDIR)$(@:%.test=%.out) -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+# checking change of parity, Oveflow and direction flag
+# 2 are disabled to avoid timeouts see mantis 3938 
+change_context_rflags.test: $(OBJDIR)change_context_rflags$(PINTOOL_SUFFIX) $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $< -o $(OBJDIR)$(@:%.test=%.out) -cf 2 -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+#	$(PIN) -t $< -o $(OBJDIR)$(@:%.test=%.out) -cf 10 -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+#	$(PIN) -t $< -o $(OBJDIR)$(@:%.test=%.out) -cf 11 -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+# checking change of parity, Oveflow and direction flag 
+change_partial_context_rflags.test: $(OBJDIR)change_context_rflags$(PINTOOL_SUFFIX) $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $< -testcontext partial -o $(OBJDIR)$(@:%.test=%.out) -cf 2 -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $< -testcontext partial -o $(OBJDIR)$(@:%.test=%.out) -cf 10 -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $< -testcontext partial -o $(OBJDIR)$(@:%.test=%.out) -cf 11 -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+#for performance get times (redirect to time file) and compare them
+context_perf.test: $(OBJDIR)context_perf$(PINTOOL_SUFFIX) $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)context_perf$(PINTOOL_SUFFIX) -c 0 -o $(OBJDIR)context_perf.out -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)context_perf$(PINTOOL_SUFFIX) -c 1 -o $(OBJDIR)context_perf.out -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)context_perf$(PINTOOL_SUFFIX) -c 2 -o $(OBJDIR)context_perf.out -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)context_perf$(PINTOOL_SUFFIX) -c 3 -o $(OBJDIR)context_perf.out -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)context_perf$(PINTOOL_SUFFIX) -c 4 -o $(OBJDIR)context_perf.out -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)context_perf.out
+
+emu_context_regvalue.test: $(OBJDIR)emu_context_regvalue$(PINTOOL_SUFFIX) $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $< -test_partial 0 -o $(OBJDIR)$(@:%.test=%.out) -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+iarg_reg_reference.test: $(OBJDIR)iarg_reg_reference$(PINTOOL_SUFFIX) $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $< -test_st 0 -test_partial 0 -o $(OBJDIR)$(@:%.test=%.out) -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+iarg_reg_const_reference.test: $(OBJDIR)iarg_reg_reference$(PINTOOL_SUFFIX) $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(PIN) -t $< -testreference const -test_st 0 -test_partial 0 -o $(OBJDIR)$(@:%.test=%.out) \
+	  -- $(OBJDIR)regvalue_app$(EXE_SUFFIX)
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+xstateComponentX87_context.test: $(OBJDIR)checkXStateBV_tool$(PINTOOL_SUFFIX) $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX)
+	$(PIN) -t $< -stateClass x87 -method context -o $(OBJDIR)$(@:%.test=%.out) \
+	  -- $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX) x87
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+xstateComponentX87_partial.test: $(OBJDIR)checkXStateBV_tool$(PINTOOL_SUFFIX) $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX)
+	$(PIN) -t $< -stateClass x87 -method partial -o $(OBJDIR)$(@:%.test=%.out) \
+	  -- $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX) x87
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+xstateComponentSSE_context.test: $(OBJDIR)checkXStateBV_tool$(PINTOOL_SUFFIX) $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX)
+	$(PIN) -t $< -stateClass SSE -method context -o $(OBJDIR)$(@:%.test=%.out) \
+	  -- $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX) SSE
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+xstateComponentSSE_partial.test: $(OBJDIR)checkXStateBV_tool$(PINTOOL_SUFFIX) $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX)
+	$(PIN) -t $< -stateClass SSE -method partial -o $(OBJDIR)$(@:%.test=%.out) \
+	  -- $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX) SSE
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+xstateComponentSSE_reference.test: $(OBJDIR)checkXStateBV_tool$(PINTOOL_SUFFIX) $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX)
+	$(PIN) -t $< -stateClass SSE -method reference -o $(OBJDIR)$(@:%.test=%.out) \
+	  -- $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX) SSE
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+xstateComponentAVX_context.test: $(OBJDIR)checkXStateBV_tool$(PINTOOL_SUFFIX) $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX)
+	$(PIN) -t $< -stateClass AVX -method context -o $(OBJDIR)$(@:%.test=%.out) \
+	  -- $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX) AVX
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+xstateComponentAVX_partial.test: $(OBJDIR)checkXStateBV_tool$(PINTOOL_SUFFIX) $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX)
+	$(PIN) -t $< -stateClass AVX -method partial -o $(OBJDIR)$(@:%.test=%.out) \
+	  -- $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX) AVX
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+xstateComponentAVX_reference.test: $(OBJDIR)checkXStateBV_tool$(PINTOOL_SUFFIX) $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX)
+	$(PIN) -t $< -stateClass AVX -method reference -o $(OBJDIR)$(@:%.test=%.out) \
+	  -- $(OBJDIR)checkXStateBV_app$(EXE_SUFFIX) AVX
+	$(RM) $(OBJDIR)$(@:%.test=%.out)
+
+xsave_memorywrite_ea.test: $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) $(OBJDIR)xsave_iarg_mem_app$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:%.test=%.out)
+	$(PIN) -t $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)$(@:%.test=%.out) -c 0 -- $(OBJDIR)xsave_iarg_mem_app$(EXE_SUFFIX) > $(OBJDIR)xsave_memorywrite_ea_app.out
+	$(PYCOMPARE) -q -p $(OBJDIR)xsave_memorywrite_ea_app.out -c $(OBJDIR)$(@:%.test=%.out)
+	$(RM) $(OBJDIR)$(@:%.test=%.out) $(OBJDIR)xsave_memorywrite_ea_app.out
+
+xsave_memoryXXX_size_IPBEFORE.test: $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) $(OBJDIR)xsave_iarg_mem_app$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:%.test=%.out)
+	$(PIN) -error_file $(OBJDIR)xsave_memoryXXX_size_IPBEFORE.err -t $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)$(@:%.test=%.out) -c 1 -- $(OBJDIR)xsave_iarg_mem_app$(EXE_SUFFIX) > $(OBJDIR)xsave_memoryXXX_size_IPBEFORE_app.out
+	$(PYCOMPARE) -q -p $(@:%.test=%.compare) -c $(OBJDIR)xsave_memoryXXX_size_IPBEFORE.out
+	$(RM) $(OBJDIR)$(@:%.test=%.out) $(OBJDIR)xsave_memoryXXX_size_IPBEFORE_app.out
+xsave_memoryXXX_size_IPAFTER.test: $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) $(OBJDIR)xsave_iarg_mem_app$(EXE_SUFFIX)
+	$(PIN) -error_file $(OBJDIR)xsave_memoryXXX_size_IPAFTER.err -t $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)$(@:%.test=%.out) -c 1 -i 1 -- $(OBJDIR)xsave_iarg_mem_app$(EXE_SUFFIX) > $(OBJDIR)xsave_memoryXXX_size_IPAFTER_app.out
+	$(PYCOMPARE) -q -p $(@:%.test=%.compare) -c $(OBJDIR)xsave_memoryXXX_size_IPAFTER.out
+	$(RM) $(OBJDIR)$(@:%.test=%.out) $(OBJDIR)xsave_memoryXXX_size_IPAFTER_app.out
+
+xsavec_memoryXXX_size_IPBEFORE.test: $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) $(OBJDIR)xsavec_iarg_mem_app$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:%.test=%.out)
+	$(PIN) -error_file $(OBJDIR)xsavec_memoryXXX_size_IPBEFORE.err -t $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)$(@:%.test=%.out) -c 1 -- $(OBJDIR)xsavec_iarg_mem_app$(EXE_SUFFIX) > $(OBJDIR)xsavec_memoryXXX_size_IPBEFORE_app.out
+	$(PYCOMPARE) -q -p $(@:%.test=%.compare) -c $(OBJDIR)xsavec_memoryXXX_size_IPBEFORE.out
+	$(RM) $(OBJDIR)$(@:%.test=%.out) $(OBJDIR)xsavec_memoryXXX_size_IPBEFORE_app.out
+
+xsavec_memoryXXX_size_IPAFTER.test: $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) $(OBJDIR)xsavec_iarg_mem_app$(EXE_SUFFIX)
+	$(PIN) -error_file $(OBJDIR)xsavec_memoryXXX_size_IPAFTER.err -t $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)$(@:%.test=%.out) -c 1 -i 1 -- $(OBJDIR)xsavec_iarg_mem_app$(EXE_SUFFIX) > $(OBJDIR)xsavec_memoryXXX_size_IPAFTER_app.out
+	$(PYCOMPARE) -q -p $(@:%.test=%.compare) -c $(OBJDIR)xsavec_memoryXXX_size_IPAFTER.out
+	$(RM) $(OBJDIR)$(@:%.test=%.out) $(OBJDIR)xsavec_memoryXXX_size_IPAFTER_app.out
+
+xsave_memoryXXX_size_IPBEFORE_ifthen.test: $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) $(OBJDIR)xsave_iarg_mem_app$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:%.test=%.out)
+	$(PIN) -error_file $(OBJDIR)xsave_memoryXXX_size_IPBEFORE.err -t $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)$(@:%.test=%.out) -c 1 -f 1 -- $(OBJDIR)xsave_iarg_mem_app$(EXE_SUFFIX) > $(OBJDIR)xsave_memoryXXX_size_IPBEFORE_app_ifthen.out
+	$(PYCOMPARE) -q -p $(@:%_ifthen.test=%.compare) -c $(OBJDIR)$(@:%.test=%.out)
+	$(RM) $(OBJDIR)$(@:%.test=%.out) $(OBJDIR)xsave_memoryXXX_size_IPBEFORE_app_ifthen.out
+xsave_memoryXXX_size_IPAFTER_ifthen.test: $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) $(OBJDIR)xsave_iarg_mem_app$(EXE_SUFFIX)
+	$(PIN) -error_file $(OBJDIR)xsave_memoryXXX_size_IPAFTER.err -t $(OBJDIR)xsave_iarg_mem$(PINTOOL_SUFFIX) \
+	  -o $(OBJDIR)$(@:%.test=%.out) -c 1 -i 1 -f 1 -- $(OBJDIR)xsave_iarg_mem_app$(EXE_SUFFIX) > $(OBJDIR)xsave_memoryXXX_size_IPAFTER_app_ifthen.out
+	$(PYCOMPARE) -q -p $(@:%_ifthen.test=%.compare) -c $(OBJDIR)$(@:%.test=%.out)
+	$(RM) $(OBJDIR)$(@:%.test=%.out) $(OBJDIR)xsave_memoryXXX_size_IPAFTER_app_ifthen.out
+
+iarg_reg_reference_flags.test: $(OBJDIR)iarg_reg_reference_flags$(PINTOOL_SUFFIX) $(OBJDIR)print_flags$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:%.test=%.out)
+	$(PIN) -t $(OBJDIR)iarg_reg_reference_flags$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:%.test=%.out) -testreference const \
+	  -- $(OBJDIR)print_flags$(EXE_SUFFIX) > $(OBJDIR)print_flags.out
+	$(QGREP) "Flags: 207" $(OBJDIR)$(@:%.test=%.out)
+	$(QGREP) "Flags: 207" $(OBJDIR)print_flags.out
+	$(PIN) -t $(OBJDIR)iarg_reg_reference_flags$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:%.test=%.out) \
+	  -- $(OBJDIR)print_flags$(EXE_SUFFIX) > $(OBJDIR)print_flags.out
+	$(QGREP) "Flags: 207" $(OBJDIR)$(@:%.test=%.out)
+	$(QGREP) "Flags: ed2" $(OBJDIR)print_flags.out
+	# Now check with -use_sahf 0
+	$(PIN) -xyzzy -use_sahf 0 -t $(OBJDIR)iarg_reg_reference_flags$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:%.test=%.out) \
+	  -testreference const -- $(OBJDIR)print_flags$(EXE_SUFFIX) > $(OBJDIR)print_flags.out
+	$(QGREP) "Flags: 207" $(OBJDIR)$(@:%.test=%.out)
+	$(QGREP) "Flags: 207" $(OBJDIR)print_flags.out
+	$(PIN) -xyzzy -use_sahf 0 -t $(OBJDIR)iarg_reg_reference_flags$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:%.test=%.out) \
+	  -- $(OBJDIR)print_flags$(EXE_SUFFIX) > $(OBJDIR)print_flags.out
+	$(QGREP) "Flags: 207" $(OBJDIR)$(@:%.test=%.out)
+	$(QGREP) "Flags: ed2" $(OBJDIR)print_flags.out
+
+fptag_conversion.test: $(OBJDIR)fptag_conversion$(PINTOOL_SUFFIX) $(OBJDIR)fptag_conversion_app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)fptag_conversion$(PINTOOL_SUFFIX) -- $(OBJDIR)fptag_conversion_app$(EXE_SUFFIX)
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+ifeq ($(MACHINE_SUPPORTS_AVX_INSTRUCTIONS),Yes)
+    ifeq ($(TARGET_OS),windows)
+        DEFINE_USING_AVX := /DCONTEXT_USING_AVX
+    else
+        DEFINE_USING_AVX := -DCONTEXT_USING_AVX
+    endif
+endif
+
+ifeq ($(MACHINE_SUPPORTS_AVX512F_INSTRUCTIONS),Yes)
+    ifeq ($(TARGET_OS),windows)
+        DEFINE_USING_AVX512F := /DCONTEXT_USING_AVX512F
+    else
+        DEFINE_USING_AVX512F := -DCONTEXT_USING_AVX512F
+    endif
+endif
+
+DEFINE_ARCH_EXTENSIONS := $(DEFINE_USING_AVX) $(DEFINE_USING_AVX512F)
+
+ifeq ($(TARGET_OS),windows)
+    REGVALUE_APP_EXPORTS := /EXPORT:ChangeRegs /EXPORT:ExecuteAt /EXPORT:SaveRegsToMem
+    CHECKXSTATEBV_APP_EXPORTS := /EXPORT:ChangeRegisterValue /EXPORT:ExecuteAt
+endif
+
+###### Special tools' build rules ######
+
+$(OBJDIR)context_regvalue$(PINTOOL_SUFFIX): $(OBJDIR)context_regvalue$(OBJ_SUFFIX) $(OBJDIR)regvalues$(OBJ_SUFFIX) $(OBJDIR)regvalue_test_utils$(OBJ_SUFFIX) $(OBJDIR)context_utils$(OBJ_SUFFIX) $(REGVALLIB)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)change_context_regvalue$(PINTOOL_SUFFIX): $(OBJDIR)change_context_regvalue$(OBJ_SUFFIX) $(OBJDIR)regvalues$(OBJ_SUFFIX) $(OBJDIR)regvalue_test_utils$(OBJ_SUFFIX) $(OBJDIR)context_utils$(OBJ_SUFFIX) $(OBJDIR)register_modification_utils$(OBJ_SUFFIX) $(REGVALLIB)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)emu_context_regvalue$(PINTOOL_SUFFIX): $(OBJDIR)emu_context_regvalue$(OBJ_SUFFIX) $(OBJDIR)regvalues$(OBJ_SUFFIX) $(OBJDIR)regvalue_test_utils$(OBJ_SUFFIX) $(OBJDIR)context_utils$(OBJ_SUFFIX) $(REGVALLIB)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)iarg_reg_reference$(PINTOOL_SUFFIX): $(OBJDIR)iarg_reg_reference$(OBJ_SUFFIX) $(OBJDIR)regvalues$(OBJ_SUFFIX) $(OBJDIR)regvalue_test_utils$(OBJ_SUFFIX) $(OBJDIR)context_utils$(OBJ_SUFFIX) $(OBJDIR)register_modification_utils$(OBJ_SUFFIX) $(REGVALLIB)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)checkXStateBV_tool$(PINTOOL_SUFFIX): $(OBJDIR)checkXStateBV_tool$(OBJ_SUFFIX) $(OBJDIR)xstateBVUtils$(OBJ_SUFFIX) $(REGVALLIB)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+###### Special applications' build rules ######
+
+$(OBJDIR)fptag_conversion_app$(EXE_SUFFIX): fptag_conversion_app.c $(OBJDIR)fptag_conversion_app_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)regvalue_app$(EXE_SUFFIX): regvalue_app.cpp $(OBJDIR)changeRegs$(OBJ_SUFFIX) $(OBJDIR)regvalues_app_noopt$(OBJ_SUFFIX) regvalues.h
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $(^:%.h=) $(APP_LDFLAGS_NOOPT) $(REGVALUE_APP_EXPORTS) $(APP_LIBS) \
+	  $(CXX_LPATHS) $(CXX_LIBS)
+
+# The xstateBVUtils is used by both the tool and the application. Options to compile source files for tool and application
+# may differ thus this mismatch might cause a link error. So instead of linking the xstateBVUtils object, the source is
+# used directly when building the application.
+$(OBJDIR)checkXStateBV_app$(EXE_SUFFIX): checkXStateBV_app.cpp xstateBVUtils.cpp xstateBVUtils.h $(OBJDIR)doXsave$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $(^:%.h=) $(APP_LDFLAGS_NOOPT) $(CHECKXSTATEBV_APP_EXPORTS) $(APP_LIBS) \
+	  $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)xsave_iarg_mem_app$(EXE_SUFFIX): xsave_iarg_mem_app.cpp $(OBJDIR)doXsave$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)xsavec_iarg_mem_app$(EXE_SUFFIX): xsavec_iarg_mem_app.cpp $(OBJDIR)doXsavec$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)print_flags$(EXE_SUFFIX): print_flags.c $(OBJDIR)print_flags_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+###### Special objects' build rules ######
+
+$(OBJDIR)regvalues$(OBJ_SUFFIX): regvalues.h
+
+$(OBJDIR)regvalues_app_noopt$(OBJ_SUFFIX): regvalues.cpp regvalues.h
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)regvalue_test_utils$(OBJ_SUFFIX): regvalue_test_utils.h regvalues.h
+
+$(OBJDIR)context_utils$(OBJ_SUFFIX): context_utils.h
+
+$(OBJDIR)register_modification_utils$(OBJ_SUFFIX): register_modification_utils.h
+
+$(OBJDIR)context_regvalue$(OBJ_SUFFIX): context_utils.h
+
+$(OBJDIR)change_context_regvalue$(OBJ_SUFFIX): context_utils.h register_modification_utils.h
+
+$(OBJDIR)emu_context_regvalue$(OBJ_SUFFIX): context_utils.h
+
+$(OBJDIR)iarg_reg_reference$(OBJ_SUFFIX): register_modification_utils.h
+
+$(OBJDIR)checkXStateBV_tool$(OBJ_SUFFIX): xstateBVUtils.h
+
+$(OBJDIR)changeRegs$(OBJ_SUFFIX): changeRegs_$(TARGET)$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(DEFINE_ARCH_EXTENSIONS) $(COMP_OBJ)$@ $<

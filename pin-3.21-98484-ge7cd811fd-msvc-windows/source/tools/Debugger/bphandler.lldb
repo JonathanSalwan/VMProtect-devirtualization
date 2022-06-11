@@ -1,0 +1,13 @@
+b ToolControlled
+b DeleteToolControlled
+b ReInsertToolControlled
+b ReActivateToolControlled
+c
+c
+br del 1
+c
+b ToolControlled
+c
+c
+c
+c

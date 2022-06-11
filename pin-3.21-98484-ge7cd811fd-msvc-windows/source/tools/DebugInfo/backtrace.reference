@@ -1,0 +1,3 @@
+baz\+0x[0-9a-f]+ at \S*backtrace\.(so|dylib)\+0x[0-9a-f]+
+bar\+0x[0-9a-f]+ at \S*backtrace\.(so|dylib)\+0x[0-9a-f]+
+foo\+0x[0-9a-f]+ at \S*backtrace\.(so|dylib)\+0x[0-9a-f]+

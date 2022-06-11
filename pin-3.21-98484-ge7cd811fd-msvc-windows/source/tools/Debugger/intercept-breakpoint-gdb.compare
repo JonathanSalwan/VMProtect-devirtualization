@@ -1,0 +1,2 @@
+Breakpoint 2,.*Breakpoint2
+(Program exited normally.|\[Inferior 1 \(Remote target\) exited normally\])

@@ -1,0 +1,15 @@
+APP: Creating thread
+TOOL: Inside my_pthread_create()
+TOOL: Inside my_wrapper_run()
+APP: In hello(): arg=0x1
+TOOL: after PIN_JitThreadStartRoutine()
+APP: Creating thread
+TOOL: Inside my_pthread_create()
+TOOL: Inside my_wrapper_run()
+APP: Joined 0
+APP: In hello(): arg=0x2
+TOOL: after PIN_JitThreadStartRoutine()
+APP: Joined 1
+APP: All threads joined
+
+TOOL: Done

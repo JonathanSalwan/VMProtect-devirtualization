@@ -1,0 +1,48 @@
+#! /bin/bash
+
+# This script will work on tools that have the --version option and print the version number in the first line.
+# It has three arguments:
+# 1) Path to the tool
+# 2) An operator (eq/ne/ge/gt/le/lt) 
+# 3) A version number 
+#
+# Example usage:
+# To test whether gcc version is == 4.3, run the following command:
+# testToolVersion /usr/bin/gcc eq 4.3
+#
+# Note:
+# This script expect the tool to have a version of this type: X.Y(.Z)*
+# If the version of some tool is only 11 instead of 11.0 it will not return correct result.
+# Also versions 5.20.1 and 5.0.1 are valid versions but 5.02.1 or 5.00.1 are not valid values for example (leading zero).
+# If your tool return different values than expected as mentioned above please use another script.
+#
+# Also the this script currently only looks on the X.Y.Z part of a tool version with X.Y.Z.W for example.
+# Also assuming X (for example) doesn't contain more than 4 digits
+
+# This function takes a string in version format (s.a 2.6.16) and makes it an integer (00020006001600000000)
+function digit_version { echo $1 | awk -F. '{ printf("%04d%04d%04d\n", $1, $2, $3); }'; }
+
+# If the application is not found, echo 0 and exit
+if [ ! -f $1 ]; then echo 0; exit; fi
+
+# $(command) or `command`
+res1=$($1 --version | egrep -o "(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){1,2}" | head -1)
+
+ver1=$(digit_version $res1)
+ver2=$(digit_version $3)
+
+# Keep for debugging
+#echo $res1
+#echo $ver1
+#echo $ver2
+
+case $2 in
+    "eq" )  if [ $ver1 -eq $ver2 ]; then echo 1; else echo 0; fi ;;
+    "ne" )  if [ $ver1 -ne $ver2 ]; then echo 1; else echo 0; fi ;;
+    "lt" )  if [ $ver1 -lt $ver2 ]; then echo 1; else echo 0; fi ;;
+    "le" )  if [ $ver1 -le $ver2 ]; then echo 1; else echo 0; fi ;;
+    "gt" )  if [ $ver1 -gt $ver2 ]; then echo 1; else echo 0; fi ;;
+    "ge" )  if [ $ver1 -ge $ver2 ]; then echo 1; else echo 0; fi ;;
+    * )     echo "Bad argument $1 (should be eq/ne/ge/gt/le/lt) " ;;
+esac
+

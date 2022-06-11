@@ -1,0 +1,15 @@
+.*Inner.*at\s*callerapp.c:26
+#0.*Inner.*at\s*callerapp.c:27
+#1.*in\s*Foo.*at\s*callerapp.c:22
+#2.*in\s*main.*at\s*callerapp.c:14
+.*= 6
+Inner.*at\s*callerapp.c:26
+#0.*Inner.*at\s*callerapp.c:27
+#1.*in\s*main.*at\s*callerapp.c:15
+.*= 10
+Inner.*at\s*callerapp.c:26
+#0.*Inner.*at\s*callerapp.c:27
+#1.*in\s*Inner.*at\s*callerapp.c:28
+#2.*in\s*main.*at\s*callerapp.c:15
+.*= 12
+(Program exited normally.$|\[Inferior 1 \(Remote target\) exited normally\])

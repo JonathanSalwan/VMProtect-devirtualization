@@ -1,0 +1,5 @@
+0x.*: .*\\ntdll.dll
+Thread .* stopped at .* \(loaded image .*\\win-foo-library.dll\)
+This is the Foo\(\) function
+Thread .* stopped at .* \(unloaded image .*\\win-foo-library.dll\)
+Program exited with 0

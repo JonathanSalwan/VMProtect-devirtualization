@@ -1,0 +1,5 @@
+BeforePinVerifyInTry
+BeforePinVerifyInDestructor
+BeforePinVerifyInCatch
+BeforePinVerifyAfterCatch
+PinFiniFunction

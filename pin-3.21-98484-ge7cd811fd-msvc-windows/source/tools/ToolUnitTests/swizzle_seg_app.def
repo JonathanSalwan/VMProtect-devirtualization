@@ -1,0 +1,9 @@
+;
+; Copyright (C) 2008-2009 Intel Corporation.
+; SPDX-License-Identifier: MIT
+;
+
+EXPORTS
+	SegAccessRtn
+	SegAccessStrRtn
+	dummy

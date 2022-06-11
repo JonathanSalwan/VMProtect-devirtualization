@@ -1,0 +1,32 @@
+Breakpoint 1.*where.*ToolControlled.*at.*bphandler_app.c.*
+Breakpoint 2.*where.*DeleteToolControlled.*at.*bphandler_app.c.*
+Breakpoint 3.*where.*ReInsertToolControlled.*at.*bphandler_app.c.*
+Breakpoint 4.*where.*ReActivateToolControlled.*at.*bphandler_app.c.*
+
+.*stop reason = breakpoint 1.*
+.*ToolControlled.*at bphandler_app.c:\d+
+-> \d+.*r.*eturn\s+1;
+
+.*stop reason = breakpoint 2.*
+.*DeleteToolControlled.*at bphandler_app.c:\d+
+-> \d+.*r.*eturn\s+1;
+
+.*stop reason = breakpoint 3.*
+.*ReInsertToolControlled.*at bphandler_app.c:\d+
+-> \d+.*r.*eturn\s+1;
+
+Breakpoint 5.*where.*ToolControlled.*at.*bphandler_app.c.*
+
+.*stop reason = breakpoint 5.*
+.*ToolControlled.*at bphandler_app.c:\d+
+-> \d+.*r.*eturn\s+1;
+
+.*stop reason = breakpoint 4.*
+.*ReActivateToolControlled.*at bphandler_app.c:\d+
+-> \d+.*r.*eturn\s+1;
+
+.*stop reason = breakpoint 5.*
+.*ToolControlled.*at bphandler_app.c:\d+
+-> \d+.*r.*eturn\s+1;
+
+Process.*exited with status = 0 .*

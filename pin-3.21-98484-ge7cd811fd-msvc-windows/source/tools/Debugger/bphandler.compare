@@ -1,0 +1,19 @@
+Breakpoint 1 at .*: file bphandler_app.c, line .*.
+Breakpoint 2 at .*: file bphandler_app.c, line .*.
+Breakpoint 3 at .*: file bphandler_app.c, line .*.
+Breakpoint 4 at .*: file bphandler_app.c, line .*.
+
+Breakpoint\s+1,\s+ToolControlled\s+\(\)\s+at\s+bphandler_app.c:\d+
+\d+\s+return\s+1;
+Breakpoint\s+2,\s+DeleteToolControlled\s+\(\)\s+at\s+bphandler_app.c:\d+
+\d+\s+return\s+1;
+Breakpoint\s+3,\s+ReInsertToolControlled\s+\(\)\s+at\s+bphandler_app.c:\d+
+\d+\s+return\s+1;
+Breakpoint\s+5\s+at\s+.*:\s+file\s+bphandler_app.c,\s+line\s+\d+.
+Breakpoint\s+5,\s+ToolControlled\s+\(\)\s+at\s+bphandler_app.c:\d+
+\d+\s+return\s+1;
+Breakpoint\s+4,\s+ReActivateToolControlled\s+\(\)\s+at\s+bphandler_app.c:\d+
+\d+\s+return\s+1;
+Breakpoint\s+5,\s+ToolControlled\s+\(\)\s+at\s+bphandler_app.c:\d+
+\d+\s+return\s+1;
+(Program exited normally.$|\[Inferior 1 \(Remote target\) exited normally\])

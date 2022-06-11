@@ -1,0 +1,709 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+# This directory contains tests for Unix-based systems only since signals
+# are a Unix concept. For convenience, we define everything that applies
+# to all the Unix systems in the generic section (below) and then remove
+# everything from Windows in the exceptions sections.
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS := sigsuspend double recursive setcontext sigusr2 sigenable interceptall faulttool action-pending \
+                   interceptsegv resetsegv-safecopy
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS := nestmask altstack errcheck fatallog sigcont fastsigcheck sigprocmask_short sig64 fatalsync futex maskcheck \
+              suspendmask fatal_block_sync simpleasync simplesync fpcheck movsbtest_$(TARGET) sigflowcheck2 syncasync \
+              interceptsegv_for_regbindings_cache intercept sigflowcheck1 resetcont log inst-type blockingsyscall \
+              then-stress faultcheck-pressure segv_on_fetch replay-signal bad-stack-noalt bad-stack-alt bad-stack-sigret \
+              call-app call-app-stress xmmcheck_$(TARGET) xmmfaultcheck_$(TARGET) alternate_stack_fork alternate_stack_thread \
+              async_exceptions blocked_async_exceptions
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS := syncasynctool exittool logtool intercepttool sigflowcheck spilltool fastsigchecktool reg-pressure-tool \
+              interceptor_for_regbindings_cache_test reporter async_multithreadingtool inst-type-tool then-stress-tool \
+              null-rewrite-tool faultcheck_flags_tool1 faultcheck_flags_tool2 faultcheck_flags_tool3 replay-signal-tool \
+              call-app-tool call-app-stress-tool
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS := simple nestmask syncasyncapp fpcheck maskcheck segv blockloop exithandler altstack errcheck fatal sigcont \
+             sigenableapp sigprocmask_short sig64 fatalsync blockingsyscall futex asyncfpe fatal_block_sync suspendmask \
+             efault shortmask segv_for_regbindings_cache_test resetsegv movsbtest_$(TARGET) resetcont \
+             inst-type-app then-stress-app segv_on_fetch replay-signal-app call-app call-app-stress xmmcheck_$(TARGET) \
+             xmmfaultcheck_$(TARGET) forktest_altstack threadtest_altstack async_exceptions
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place architecture-specific definitions here ######
+
+# Place ia32-specific definitions here if they apply to all supported operating systems.
+ifeq ($(TARGET),ia32)
+    TEST_ROOTS += xmmfaultcheckspill_ia32 faultcheck-ia32 faultcheck_flags_ia32_1 hlt sigaltstack dfcheck_ia32 fptags_ia32 \
+                  faultcheck_flags_ia32_2
+    APP_ROOTS += faultcheck-ia32 faultcheck_flags_ia32 hlt sigaltstack dfcheck_ia32 fptags_ia32 bad-stack-ia32
+endif
+
+# Place intel64-specific definitions here if they apply to all supported operating systems.
+ifeq ($(TARGET),intel64)
+    TEST_ROOTS += faultcheck-intel64
+    APP_ROOTS += faultcheck-intel64 bad-stack-intel64
+endif
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_ROOTS += mtstress resetsegv efault async_multithreading asyncfpe shortmask
+    TOOL_ROOTS += raise-exception-tool
+    APP_ROOTS += async_multithreadingapp mtstress
+    ifeq ($(TARGET),ia32)
+        TEST_ROOTS += raise-exception-ia32 raise-exception-ia32-const-context handlerAlignment
+        APP_ROOTS += handlerAlignment
+        OBJECT_ROOTS += handlerAlignment_asm
+    endif 
+    ifeq ($(TARGET),intel64)
+        TEST_ROOTS += dfcheck_intel64 insfault-native insfault-notool insfault-pressure raise-exception-intel64 \
+                      raise-exception-intel64-const-context
+        APP_ROOTS += dfcheck_intel64 insfault
+    endif 
+    ifeq ($(ATTACH),1)
+        TEST_TOOL_ROOTS += sigsegv_attach
+        APP_ROOTS += sigsegv_attach_app
+    endif
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+# Windows does not have signals, therefore don't test this directory on that OS.
+ifeq ($(TARGET_OS),windows)
+    TEST_TOOL_ROOTS :=
+    TEST_ROOTS :=
+    TOOL_ROOTS :=
+    SA_TOOL_ROOTS :=
+    APP_ROOTS :=
+    OBJECT_ROOTS :=
+    DLL_ROOTS :=
+    LIB_ROOTS := 
+endif
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+# The following tests are disabled. See Mantis #443.
+TEST_TOOL_ROOTS := $(filter-out sigsuspend double recursive setcontext sigusr2, $(TEST_TOOL_ROOTS))
+
+# See Mantis 4053
+ifeq ($(TARGET_OS),linux)
+    TEST_ROOTS := $(filter-out mtstress, $(TEST_ROOTS))
+    APP_ROOTS := $(filter-out mtstress, $(APP_ROOTS))
+endif
+
+BINUTILS_GE_235 := $(shell $(TOOLS_ROOT)/Utils/testToolVersion `which ld` ge 2.35)
+
+# Mantis 4874
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(TARGET),intel64)
+        ifeq ($(BINUTILS_GE_235),1)
+            TEST_ROOTS := $(filter-out faultcheck-pressure faultcheck-intel64 \
+                            raise-exception-intel64 raise-exception-intel64-const-context , $(TEST_ROOTS))
+            APP_ROOTS := $(filter-out faultcheck-intel64, $(APP_ROOTS))
+        endif
+    endif
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+nestmask.test: $(OBJDIR)nestmask$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)nestmask$(EXE_SUFFIX)
+
+interceptsegv.test: $(OBJDIR)interceptsegv$(PINTOOL_SUFFIX) $(OBJDIR)segv$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)interceptsegv$(PINTOOL_SUFFIX) -o $(OBJDIR)interceptsegv.toolout -- $(OBJDIR)segv$(EXE_SUFFIX)
+	$(PYCOMPARE) -p interceptsegv.compare -c $(OBJDIR)interceptsegv.toolout
+	$(RM) $(OBJDIR)interceptsegv.toolout
+
+interceptsegv_for_regbindings_cache.test: $(OBJDIR)interceptor_for_regbindings_cache_test$(PINTOOL_SUFFIX) $(OBJDIR)segv_for_regbindings_cache_test$(EXE_SUFFIX)
+	$(PIN) -xyzzy -statistic -logfile $(OBJDIR)interceptsegv_for_regbindings_cache.log \
+	  -t $(OBJDIR)interceptor_for_regbindings_cache_test$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)segv_for_regbindings_cache_test$(EXE_SUFFIX)
+	$(BASHTEST) `$(GREP) regbindings_cache_hits $(OBJDIR)interceptsegv_for_regbindings_cache.log | $(CGREP) 0` -eq 0
+	$(RM) $(OBJDIR)interceptsegv_for_regbindings_cache.log
+
+syncasync.test: $(OBJDIR)syncasynctool$(PINTOOL_SUFFIX) $(OBJDIR)syncasyncapp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)syncasynctool$(PINTOOL_SUFFIX) -- $(OBJDIR)syncasyncapp$(EXE_SUFFIX)
+
+async_multithreading.test: $(OBJDIR)async_multithreadingtool$(PINTOOL_SUFFIX) $(OBJDIR)async_multithreadingapp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)async_multithreadingtool$(PINTOOL_SUFFIX) -- $(OBJDIR)async_multithreadingapp$(EXE_SUFFIX)
+
+fpcheck.test: $(OBJDIR)fpcheck$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)fpcheck$(EXE_SUFFIX)
+
+handlerAlignment.test: $(OBJDIR)handlerAlignment$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)handlerAlignment$(EXE_SUFFIX) 1 > $(OBJDIR)handlerAlignment.out.1 2>&1
+	$(PIN) -- $(OBJDIR)handlerAlignment$(EXE_SUFFIX) 2 > $(OBJDIR)handlerAlignment.out.2 2>&1
+	$(PIN) -- $(OBJDIR)handlerAlignment$(EXE_SUFFIX) 3 > $(OBJDIR)handlerAlignment.out.3 2>&1
+	$(PIN) -- $(OBJDIR)handlerAlignment$(EXE_SUFFIX) 4 > $(OBJDIR)handlerAlignment.out.4 2>&1
+	$(RM) $(OBJDIR)handlerAlignment.out.*
+
+xmmcheck_$(TARGET).test: $(OBJDIR)xmmcheck_$(TARGET)$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)xmmcheck_$(TARGET)$(EXE_SUFFIX)
+
+xmmfaultcheck_$(TARGET).test: $(OBJDIR)xmmfaultcheck_$(TARGET)$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)xmmfaultcheck_$(TARGET)$(EXE_SUFFIX)
+
+xmmfaultcheckspill_ia32.test: $(OBJDIR)xmmfaultcheck_ia32$(EXE_SUFFIX) $(OBJDIR)spilltool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)spilltool$(PINTOOL_SUFFIX) -- $(OBJDIR)xmmfaultcheck_ia32$(EXE_SUFFIX)
+
+log.test: $(OBJDIR)logtool$(PINTOOL_SUFFIX) $(OBJDIR)nestmask$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)logtool$(PINTOOL_SUFFIX) -o $(OBJDIR)log.out -- $(OBJDIR)nestmask$(EXE_SUFFIX)
+	$(CMP) $(OBJDIR)log.out log.reference
+	$(RM) $(OBJDIR)log.out
+
+intercept.test: $(OBJDIR)intercepttool$(PINTOOL_SUFFIX) $(OBJDIR)blockloop$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)intercept.out; touch $(OBJDIR)intercept.out; \
+    $(PIN) -pause_tool 1 -t $(OBJDIR)intercepttool$(PINTOOL_SUFFIX) -s 1 -c 2 \
+      -- $(OBJDIR)blockloop$(EXE_SUFFIX) 2> $(OBJDIR)intercept.tool.out | tee $(OBJDIR)intercept.out & \
+    until $(GREP) 'Signals are blocked' $(OBJDIR)intercept.out > /dev/null; \
+      do sleep 5; \
+      if ! kill -s 0 $$! > /dev/null 2>&1; then \
+        echo "intercept.test: Aborted because Pin process terminated"; \
+        exit 1; \
+      fi; \
+    done; \
+    pid=`head -1 $(OBJDIR)intercept.out | sed 's/.*to process with pid//'`; \
+    kill -HUP $$pid; \
+    until $(GREP) 'Intercepting signal' $(OBJDIR)intercept.tool.out > /dev/null; \
+      do sleep 1; \
+      if ! kill -s 0 $$! > /dev/null 2>&1; then \
+        echo "intercept.test: Aborted because Pin process terminated"; \
+        exit 1; \
+      fi; \
+    done; \
+    kill -HUP $$pid; \
+    wait $$!
+	$(CMP) $(OBJDIR)intercept.tool.out intercept.tool.reference
+	$(RM) $(OBJDIR)intercept.tool.out
+
+maskcheck.test: $(OBJDIR)maskcheck$(EXE_SUFFIX)
+	$(OBJDIR)maskcheck$(EXE_SUFFIX) > $(OBJDIR)maskcheck.out
+	$(PIN) -- $(OBJDIR)maskcheck$(EXE_SUFFIX) > $(OBJDIR)maskcheck.pin.out
+	$(CMP) $(OBJDIR)maskcheck.out $(OBJDIR)maskcheck.pin.out
+	$(RM) $(OBJDIR)maskcheck.out $(OBJDIR)maskcheck.pin.out
+
+sigflowcheck1.test: $(OBJDIR)sigflowcheck$(PINTOOL_SUFFIX) $(OBJDIR)nestmask$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)sigflowcheck$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:.test=.tool.out) \
+	  -- $(OBJDIR)nestmask$(EXE_SUFFIX) > $(OBJDIR)sigflowcheck1.out
+	$(CMP) $(OBJDIR)$(@:.test=.tool.out) sigflowcheck1.reference
+	$(RM) $(OBJDIR)$(@:.test=.tool.out)
+
+sigflowcheck2.test: $(OBJDIR)sigflowcheck$(PINTOOL_SUFFIX) $(OBJDIR)exithandler$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)sigflowcheck$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:.test=.tool.out) \
+	  -- $(OBJDIR)exithandler$(EXE_SUFFIX) > $(OBJDIR)sigflowcheck2.out
+	$(CMP) $(OBJDIR)$(@:.test=.tool.out) sigflowcheck2.reference
+	$(RM) $(OBJDIR)$(@:.test=.tool.out)
+
+simpleasync.test: $(OBJDIR)simple$(EXE_SUFFIX) $(OBJDIR)exittool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)exittool$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:.test=.tool.out) -- $(OBJDIR)simple$(EXE_SUFFIX) \
+	  > $(OBJDIR)$(@:.test=.app.out)
+	$(GREP) "Tool sees exit" $(OBJDIR)$(@:.test=.tool.out)
+	$(CMP) $(OBJDIR)$(@:.test=.app.out) simpleasync.reference
+	$(RM) $(OBJDIR)$(@:.test=.tool.out) $(OBJDIR)$(@:.test=.app.out)
+
+simplesync.test: $(OBJDIR)segv$(EXE_SUFFIX) $(OBJDIR)exittool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)exittool$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:.test=.tool.out) -- $(OBJDIR)segv$(EXE_SUFFIX) \
+	  > $(OBJDIR)$(@:.test=.app.out)
+	$(GREP) "Tool sees exit" $(OBJDIR)$(@:.test=.tool.out)
+	$(CMP) $(OBJDIR)$(@:.test=.app.out) simplesync.reference
+	$(RM) $(OBJDIR)$(@:.test=.tool.out) $(OBJDIR)$(@:.test=.app.out)
+
+altstack.test: $(OBJDIR)altstack$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)altstack$(EXE_SUFFIX)
+
+faultcheck-ia32.test: $(OBJDIR)faultcheck-ia32$(EXE_SUFFIX)
+	$(OBJDIR)faultcheck-ia32$(EXE_SUFFIX) > $(OBJDIR)faultcheck-ia32.out
+	$(PIN) -- $(OBJDIR)faultcheck-ia32$(EXE_SUFFIX) > $(OBJDIR)faultcheck-ia32.pin.out
+	$(CMP) $(OBJDIR)faultcheck-ia32.out $(OBJDIR)faultcheck-ia32.pin.out
+	$(RM) $(OBJDIR)faultcheck-ia32.out $(OBJDIR)faultcheck-ia32.pin.out
+
+faultcheck-intel64.test: $(OBJDIR)faultcheck-intel64$(EXE_SUFFIX)
+	$(OBJDIR)faultcheck-intel64$(EXE_SUFFIX) > $(OBJDIR)faultcheck-intel64.out
+	$(PIN) -- $(OBJDIR)faultcheck-intel64$(EXE_SUFFIX) > $(OBJDIR)faultcheck-intel64.pin.out
+	$(CMP) $(OBJDIR)faultcheck-intel64.out $(OBJDIR)faultcheck-intel64.pin.out
+	$(RM) $(OBJDIR)faultcheck-intel64.out $(OBJDIR)faultcheck-intel64.pin.out
+
+faultcheck_flags_ia32_1.test: $(OBJDIR)faultcheck_flags_ia32$(EXE_SUFFIX) $(OBJDIR)faultcheck_flags_tool1$(PINTOOL_SUFFIX)
+	$(OBJDIR)faultcheck_flags_ia32$(EXE_SUFFIX) > $(OBJDIR)faultcheck_flags_ia32_1.out
+	$(PIN) -t $(OBJDIR)faultcheck_flags_tool1$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)faultcheck_flags_ia32$(EXE_SUFFIX) > $(OBJDIR)faultcheck_flags_ia32_1.pin.out
+	$(CMP) $(OBJDIR)faultcheck_flags_ia32_1.out $(OBJDIR)faultcheck_flags_ia32_1.pin.out
+	$(RM) $(OBJDIR)faultcheck_flags_ia32_1.out $(OBJDIR)faultcheck_flags_ia32_1.pin.out
+
+faultcheck_flags_ia32_2.test: $(OBJDIR)faultcheck_flags_ia32$(EXE_SUFFIX) $(OBJDIR)faultcheck_flags_tool2$(PINTOOL_SUFFIX)
+	$(OBJDIR)faultcheck_flags_ia32$(EXE_SUFFIX) > $(OBJDIR)faultcheck_flags_ia32_2.out
+	$(PIN) -t $(OBJDIR)faultcheck_flags_tool1$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)faultcheck_flags_ia32$(EXE_SUFFIX) > $(OBJDIR)faultcheck_flags_ia32_2.pin.out
+	$(CMP) $(OBJDIR)faultcheck_flags_ia32_2.out $(OBJDIR)faultcheck_flags_ia32_2.pin.out
+	$(RM) $(OBJDIR)faultcheck_flags_ia32_2.out $(OBJDIR)faultcheck_flags_ia32_2.pin.out
+
+faultcheck_flags_ia32_3.test: $(OBJDIR)faultcheck_flags_ia32$(EXE_SUFFIX) $(OBJDIR)faultcheck_flags_tool3$(PINTOOL_SUFFIX)
+	$(OBJDIR)faultcheck_flags_ia32$(EXE_SUFFIX) > $(OBJDIR)faultcheck_flags_ia32_3.out
+	$(PIN) -t $(OBJDIR)faultcheck_flags_tool1$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)faultcheck_flags_ia32$(EXE_SUFFIX) > $(OBJDIR)faultcheck_flags_ia32_3.pin.out
+	$(CMP) $(OBJDIR)faultcheck_flags_ia32_3.out $(OBJDIR)faultcheck_flags_ia32_3.pin.out
+	$(RM) $(OBJDIR)faultcheck_flags_ia32_3.out $(OBJDIR)faultcheck_flags_ia32_3.pin.out
+
+errcheck.test: $(OBJDIR)errcheck$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)errcheck$(EXE_SUFFIX)
+
+movsbtest_$(TARGET).test: $(OBJDIR)movsbtest_$(TARGET)$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)movsbtest_$(TARGET)$(EXE_SUFFIX)
+
+double.test: $(OBJDIR)double$(EXE_SUFFIX)
+	$(OBJDIR)double$(EXE_SUFFIX) > $(OBJDIR)double.out
+	$(PIN) -- $(OBJDIR)double$(EXE_SUFFIX) > $(OBJDIR)double.pin.out
+	$(CMP) $(OBJDIR)double.out $(OBJDIR)double.pin.out
+	$(RM) $(OBJDIR)double.out $(OBJDIR)double.pin.out
+
+hlt.test: $(OBJDIR)hlt$(EXE_SUFFIX)
+	$(OBJDIR)hlt$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.app.out)
+	$(PIN) -- $(OBJDIR)hlt$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out)
+	$(CMP) $(OBJDIR)$(@:.test=.app.out) $(OBJDIR)$(@:.test=.out)
+	$(RM) $(OBJDIR)$(@:.test=.app.out) $(OBJDIR)$(@:.test=.out)
+
+hlt_pie.test: $(OBJDIR)hlt_pie$(EXE_SUFFIX)
+	$(DISABLE_ASLR) $(OBJDIR)hlt_pie$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.app.out)
+	$(DISABLE_ASLR) $(PIN) -- $(OBJDIR)hlt_pie$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out)
+	$(CMP) $(OBJDIR)$(@:.test=.app.out) $(OBJDIR)$(@:.test=.out)
+	$(RM) $(OBJDIR)$(@:.test=.app.out) $(OBJDIR)$(@:.test=.out)
+
+recursive.test: $(OBJDIR)recursive$(EXE_SUFFIX)
+	$(OBJDIR)recursive$(EXE_SUFFIX) > $(OBJDIR)recursive.out
+	$(PIN) -- $(OBJDIR)recursive$(EXE_SUFFIX) > $(OBJDIR)recursive.pin.out
+	$(CMP) $(OBJDIR)recursive.out $(OBJDIR)recursive.pin.out
+	$(RM) $(OBJDIR)recursive.out $(OBJDIR)recursive.pin.out
+
+setcontext.test: $(OBJDIR)setcontext$(EXE_SUFFIX)
+	$(OBJDIR)setcontext$(EXE_SUFFIX) > $(OBJDIR)setcontext.out
+	$(PIN) -- $(OBJDIR)setcontext$(EXE_SUFFIX) > $(OBJDIR)setcontext.pin.out
+	$(CMP) $(OBJDIR)setcontext.out $(OBJDIR)setcontext.pin.out
+	$(RM) $(OBJDIR)setcontext.out $(OBJDIR)setcontext.pin.out
+
+sigaltstack.test: $(OBJDIR)sigaltstack$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)sigaltstack$(EXE_SUFFIX)
+
+sigsuspend.test: $(OBJDIR)sigsuspend$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)sigsuspend$(EXE_SUFFIX)
+
+sigusr2.test: $(OBJDIR)sigusr2$(EXE_SUFFIX)
+	$(OBJDIR)sigusr2$(EXE_SUFFIX) > $(OBJDIR)sigusr2.out
+	$(PIN) -- $(OBJDIR)sigusr2$(EXE_SUFFIX) > $(OBJDIR)sigusr2.pin.out
+	$(CMP) $(OBJDIR)sigusr2.out $(OBJDIR)sigusr2.pin.out
+	$(RM) $(OBJDIR)sigusr2.out $(OBJDIR)sigusr2.pin.out
+
+fatallog.test: $(OBJDIR)fatal$(EXE_SUFFIX) $(OBJDIR)logtool$(PINTOOL_SUFFIX)
+	-$(PIN) -t $(OBJDIR)logtool$(PINTOOL_SUFFIX) -o $(OBJDIR)fatallog.out -- $(OBJDIR)fatal$(EXE_SUFFIX); exit 0 
+	$(CMP) $(OBJDIR)fatallog.out fatallog.reference
+	$(RM) $(OBJDIR)fatallog.out
+
+sigcont.test: $(OBJDIR)sigcont$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)sigcont$(EXE_SUFFIX)
+
+fastsigcheck.test: $(OBJDIR)fastsigchecktool$(PINTOOL_SUFFIX) $(OBJDIR)fpcheck$(EXE_SUFFIX)
+	$(PIN) -xyzzy -statistic -logfile $(OBJDIR)fastsigcheck.log -t $(OBJDIR)fastsigchecktool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)fpcheck$(EXE_SUFFIX)
+	#
+	# This tests if the number of "slow" signals is less than 5%
+	#
+	pctSlow=`$(GREP) -F 'pin::signal::total/slow' $(OBJDIR)fastsigcheck.log | sed -e 's/.*norm: *\([0-9\.]*\).*/\1/'`; \
+	  $(BASHTEST) `expr $$pctSlow \< 0.05` -eq "1"
+	$(RM) $(OBJDIR)fastsigcheck.log
+
+sigenable.test: $(OBJDIR)sigenable$(PINTOOL_SUFFIX) $(OBJDIR)sigenableapp$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)sigenable$(PINTOOL_SUFFIX) -- $(OBJDIR)sigenableapp$(EXE_SUFFIX) > $(OBJDIR)sigenable.out
+	$(CMP) $(OBJDIR)sigenable.out sigenable.reference
+	$(RM) $(OBJDIR)sigenable.out
+
+sigprocmask_short.test: $(OBJDIR)sigprocmask_short$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)sigprocmask_short$(EXE_SUFFIX)
+
+sig64.test: $(OBJDIR)sig64$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)sig64$(EXE_SUFFIX)
+
+faulttool.test: $(OBJDIR)faulttool$(PINTOOL_SUFFIX) $(OBJDIR)simple$(EXE_SUFFIX)
+	@echo "The 'faulttool' test is expected to seg fault and dump core"
+	-$(PIN) -t $(OBJDIR)faulttool$(PINTOOL_SUFFIX) -- $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)faulttool.out
+	$(QGREP) "Tool (or Pin) caused signal" $(OBJDIR)faulttool.out
+	$(QGREP) "Location may be in in-lined analysis code, try re-running with '-inline 0' to debug it" $(OBJDIR)faulttool.out
+	$(RM) $(OBJDIR)faulttool.out
+
+dfcheck_$(TARGET).test: $(OBJDIR)dfcheck_$(TARGET)$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)dfcheck_$(TARGET)$(EXE_SUFFIX)
+
+fatalsync.test: $(OBJDIR)fatalsync$(EXE_SUFFIX)
+	@echo "The 'fatalsync' test is expected to seg fault"
+	-$(PIN) -- $(OBJDIR)fatalsync$(EXE_SUFFIX) > $(OBJDIR)fatalsync.out
+	if $(QGREP) "assertion failed" $(OBJDIR)fatalsync.out; then exit 1; fi
+	$(RM) $(OBJDIR)fatalsync.out
+
+blockingsyscall.test: $(OBJDIR)blockingsyscall$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)blockingsyscall$(EXE_SUFFIX) > $(OBJDIR)blockingsyscall.out
+	$(CMP) $(OBJDIR)blockingsyscall.out blockingsyscall.reference
+	$(RM) $(OBJDIR)blockingsyscall.out
+
+futex.test: $(OBJDIR)futex$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)futex$(EXE_SUFFIX)
+
+async_exceptions.test: $(OBJDIR)async_exceptions$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)async_exceptions$(EXE_SUFFIX)
+
+blocked_async_exceptions.test: $(OBJDIR)async_exceptions$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)async_exceptions$(EXE_SUFFIX) 1
+
+fptags_ia32.test: $(OBJDIR)fptags_ia32$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)fptags_ia32$(EXE_SUFFIX)
+
+asyncfpe.test: $(OBJDIR)asyncfpe$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)asyncfpe$(EXE_SUFFIX)
+
+segv_on_fetch.test: $(OBJDIR)segv_on_fetch$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)segv_on_fetch$(EXE_SUFFIX)
+
+fatal_block_sync.test: $(OBJDIR)fatal_block_sync$(EXE_SUFFIX) $(OBJDIR)exittool$(PINTOOL_SUFFIX)
+	@echo "The 'fatal_block_sync' test is expected to seg fault"
+	-$(PIN) -t $(OBJDIR)exittool$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:.test=.tool.out) \
+	  -- $(OBJDIR)fatal_block_sync$(EXE_SUFFIX) > $(OBJDIR)$(@:test=app.out)
+	$(CMP) $(OBJDIR)$(@:.test=.tool.out) $(@:test=reference)
+	$(RM) $(OBJDIR)$(@:.test=.tool.out)
+
+suspendmask.test: $(OBJDIR)suspendmask$(EXE_SUFFIX)
+	$(OBJDIR)suspendmask$(EXE_SUFFIX) > $(OBJDIR)suspendmask.out
+	$(PIN) -- $(OBJDIR)suspendmask$(EXE_SUFFIX) > $(OBJDIR)suspendmask.pin.out
+	$(CMP) $(OBJDIR)suspendmask.out $(OBJDIR)suspendmask.pin.out
+	$(RM) $(OBJDIR)suspendmask.out $(OBJDIR)suspendmask.pin.out
+
+efault.test: $(OBJDIR)efault$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)efault$(EXE_SUFFIX)
+
+raise-exception-ia32.test: $(OBJDIR)faultcheck-ia32$(EXE_SUFFIX) $(OBJDIR)raise-exception-tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)faultcheck-ia32$(EXE_SUFFIX) > $(OBJDIR)raise-exception-ia32.out
+	$(PIN) -t $(OBJDIR)raise-exception-tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)faultcheck-ia32$(EXE_SUFFIX) > $(OBJDIR)raise-exception-ia32.pin.out
+	$(CMP) $(OBJDIR)raise-exception-ia32.out $(OBJDIR)raise-exception-ia32.pin.out
+	$(RM) $(OBJDIR)raise-exception-ia32.out $(OBJDIR)raise-exception-ia32.pin.out
+
+raise-exception-intel64.test: $(OBJDIR)faultcheck-intel64$(EXE_SUFFIX) $(OBJDIR)raise-exception-tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)faultcheck-intel64$(EXE_SUFFIX) > $(OBJDIR)raise-exception-intel64.out
+	$(PIN) -t $(OBJDIR)raise-exception-tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)faultcheck-intel64$(EXE_SUFFIX) > $(OBJDIR)raise-exception-intel64.pin.out
+	$(CMP) $(OBJDIR)raise-exception-intel64.out $(OBJDIR)raise-exception-intel64.pin.out
+	$(RM) $(OBJDIR)raise-exception-intel64.out $(OBJDIR)raise-exception-intel64.pin.out
+
+raise-exception-ia32-const-context.test: $(OBJDIR)faultcheck-ia32$(EXE_SUFFIX) $(OBJDIR)raise-exception-tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)faultcheck-ia32$(EXE_SUFFIX) > $(OBJDIR)raise-exception-ia32-const-context.out
+	$(PIN) -t $(OBJDIR)raise-exception-tool$(PINTOOL_SUFFIX) -const_context \
+	  -- $(OBJDIR)faultcheck-ia32$(EXE_SUFFIX) > $(OBJDIR)raise-exception-ia32-const-context.pin.out
+	$(CMP) $(OBJDIR)raise-exception-ia32-const-context.out $(OBJDIR)raise-exception-ia32-const-context.pin.out
+	$(RM) $(OBJDIR)raise-exception-ia32-const-context.out $(OBJDIR)raise-exception-ia32-const-context.pin.out
+
+raise-exception-intel64-const-context.test: $(OBJDIR)faultcheck-intel64$(EXE_SUFFIX) $(OBJDIR)raise-exception-tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)faultcheck-intel64$(EXE_SUFFIX) > $(OBJDIR)raise-exception-intel64-const-context.out
+	$(PIN) -t $(OBJDIR)raise-exception-tool$(PINTOOL_SUFFIX) -const_context \
+	  -- $(OBJDIR)faultcheck-intel64$(EXE_SUFFIX) > $(OBJDIR)raise-exception-intel64-const-context.pin.out
+	$(CMP) $(OBJDIR)raise-exception-intel64-const-context.out $(OBJDIR)raise-exception-intel64-const-context.pin.out
+	$(RM) $(OBJDIR)raise-exception-intel64-const-context.out $(OBJDIR)raise-exception-intel64-const-context.pin.out
+
+
+shortmask.test: $(OBJDIR)shortmask$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)shortmask$(EXE_SUFFIX)
+
+action-pending.test: $(OBJDIR)simple$(EXE_SUFFIX) $(OBJDIR)action-pending$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)action-pending$(PINTOOL_SUFFIX) -- $(OBJDIR)simple$(EXE_SUFFIX)
+
+# Test the PIN_ReplayUnixSignal() API.
+#
+replay-signal.test: $(OBJDIR)replay-signal-app$(EXE_SUFFIX) $(OBJDIR)replay-signal-tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)replay-signal-tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)replay-signal-app$(EXE_SUFFIX) > $(OBJDIR)replay-signal.pin.out
+	$(CMP) $(OBJDIR)replay-signal.pin.out replay-signal.reference
+	$(RM) $(OBJDIR)replay-signal.pin.out
+
+# Test's Pin's handling of the SA_RESETHAND flag with a signal that is fatal by default.
+#
+resetsegv.test: $(OBJDIR)resetsegv$(EXE_SUFFIX) $(OBJDIR)logtool$(PINTOOL_SUFFIX)
+	-$(OBJDIR)resetsegv$(EXE_SUFFIX) > $(OBJDIR)resetsegv.out
+	-$(PIN) -t $(OBJDIR)logtool$(PINTOOL_SUFFIX) -o $(OBJDIR)resetsegv.tool.out \
+	  -- $(OBJDIR)resetsegv$(EXE_SUFFIX) > $(OBJDIR)resetsegv.pin.out
+	$(CMP) $(OBJDIR)resetsegv.out $(OBJDIR)resetsegv.pin.out
+	$(CMP) $(OBJDIR)resetsegv.tool.out resetsegv.reference
+	$(RM) $(OBJDIR)resetsegv.out $(OBJDIR)resetsegv.pin.out $(OBJDIR)resetsegv.tool.out
+
+# Test's Pin's handling of the SA_RESETHAND flag with a signal that is ignored by default.
+#
+resetcont.test: $(OBJDIR)resetcont$(EXE_SUFFIX) $(OBJDIR)logtool$(PINTOOL_SUFFIX)
+	$(OBJDIR)resetcont$(EXE_SUFFIX) > $(OBJDIR)resetcont.out
+	$(PIN) -t $(OBJDIR)logtool$(PINTOOL_SUFFIX) -o $(OBJDIR)resetcont.tool.out \
+	  -- $(OBJDIR)resetcont$(EXE_SUFFIX) > $(OBJDIR)resetcont.pin.out
+	$(CMP) $(OBJDIR)resetcont.out $(OBJDIR)resetcont.pin.out
+	$(CMP) $(OBJDIR)resetcont.tool.out resetcont.reference
+	$(RM) $(OBJDIR)resetcont.out $(OBJDIR)resetcont.pin.out $(OBJDIR)resetcont.tool.out
+
+# Test that SafeCopy() works even if the application sets up a SEGV handler with SA_RESETHAND.
+#
+resetsegv-safecopy.test: $(OBJDIR)resetsegv$(EXE_SUFFIX) $(OBJDIR)resetsegv-safecopy$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)resetsegv-safecopy$(PINTOOL_SUFFIX) -- $(OBJDIR)resetsegv$(EXE_SUFFIX)
+
+# Test the behavior when a signal cannot be handled because the application's stack is bad.
+#
+# On Linux, the kernel delivers a SEGV, which also cannot be handled.  The kernel then
+# sends a fatal SEGV.
+#
+# Note that older kernels have different behavior, but Pin emulates the behavior of the
+# most recent kernel (as of Linux 2.6.30).
+#
+bad-stack-noalt.test: $(OBJDIR)bad-stack-$(TARGET)$(EXE_SUFFIX) $(OBJDIR)reporter$(PINTOOL_SUFFIX)
+	-$(PIN) -t $(OBJDIR)reporter$(PINTOOL_SUFFIX) -o $(OBJDIR)bad-stack-noalt.toolout \
+	  -- $(OBJDIR)bad-stack-$(TARGET)$(EXE_SUFFIX) sigill noaltstack > $(OBJDIR)bad-stack-noalt.out
+	$(CMP) $(OBJDIR)bad-stack-noalt.out bad-stack-noalt-$(TARGET_OS).reference
+	$(CMP) $(OBJDIR)bad-stack-noalt.toolout bad-stack-noalt-$(TARGET_OS).toolreference
+	$(RM) $(OBJDIR)bad-stack-noalt.toolout $(OBJDIR)bad-stack-noalt.out
+
+# Test the behavior when a signal cannot be handled because the application's stack is bad.
+#
+# On Linux, the kernel shoild deliver a SEGV, which the application handles on an alternate signal stack.
+#
+# Note that older kernels have different behavior, but Pin emulates the behavior of the
+# most recent kernel (as of Linux 2.6.30).
+#
+bad-stack-alt.test: $(OBJDIR)bad-stack-$(TARGET)$(EXE_SUFFIX) $(OBJDIR)reporter$(PINTOOL_SUFFIX)
+	-$(PIN) -t $(OBJDIR)reporter$(PINTOOL_SUFFIX) -o $(OBJDIR)bad-stack-alt.toolout \
+	  -- $(OBJDIR)bad-stack-$(TARGET)$(EXE_SUFFIX) sigill altstack > $(OBJDIR)bad-stack-alt.out
+	$(CMP) $(OBJDIR)bad-stack-alt.out bad-stack-alt-$(TARGET_OS).reference
+	$(CMP) $(OBJDIR)bad-stack-alt.toolout bad-stack-alt-$(TARGET_OS).toolreference
+	$(RM) $(OBJDIR)bad-stack-alt.toolout $(OBJDIR)bad-stack-alt.out
+
+# Test the behavior when a sigretrun system call cannot read a signal context from the
+# application's stack.
+#
+# On Linux, the kernel should send a SEGV, which the application handles on an alternate signal stack.
+#
+# Note that older kernels have different behavior, but Pin emulates the behavior of the
+# most recent kernel (as of Linux 2.6.30).
+#
+bad-stack-sigret.test: $(OBJDIR)bad-stack-$(TARGET)$(EXE_SUFFIX) $(OBJDIR)reporter$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)reporter$(PINTOOL_SUFFIX) -o $(OBJDIR)stack-sigret.toolout \
+	  -- $(OBJDIR)bad-stack-$(TARGET)$(EXE_SUFFIX) sigreturn altstack > $(OBJDIR)stack-sigret.out
+	$(CMP) $(OBJDIR)stack-sigret.out bad-stack-sigret-$(TARGET_OS).reference
+	$(CMP) $(OBJDIR)stack-sigret.toolout bad-stack-sigret-$(TARGET_OS).toolreference
+	$(RM) $(OBJDIR)stack-sigret.toolout $(OBJDIR)stack-sigret.out
+
+# Stress test for signal handling in a multi-threaded application.
+#
+mtstress.test: $(OBJDIR)mtstress$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)mtstress$(EXE_SUFFIX) > $(OBJDIR)mtstress.out
+	$(RM) $(OBJDIR)mtstress.out
+
+# Test that signals can be delivered when there are various types of instrumentation
+# calls (inline, if/then, bridge routine, etc).
+#
+inst-type.test: $(OBJDIR)inst-type-app$(EXE_SUFFIX) $(OBJDIR)inst-type-tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)inst-type-tool$(PINTOOL_SUFFIX) -- $(OBJDIR)inst-type-app$(EXE_SUFFIX) > $(OBJDIR)inst-type.out
+	$(RM) $(OBJDIR)inst-type.out
+
+# Test that a signal delivered during a "then" analysis routine will not force Pin to deliver the signal
+# using the "slow" mechanism (unlinking the entire code cache).  Previously, "then" analysis routines
+# cause the "current location" markers to be set incorectly, which caused Pin to deliver signals using
+# the slow mechanism.
+#
+then-stress.test: $(OBJDIR)then-stress-app$(EXE_SUFFIX) $(OBJDIR)then-stress-tool$(PINTOOL_SUFFIX)
+	$(PIN) -xyzzy -statistic -logfile $(OBJDIR)then-stress.log -t $(OBJDIR)then-stress-tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)then-stress-app$(EXE_SUFFIX) > $(OBJDIR)then-stress.out
+	#
+	# This tests if the number of "slow" signals is less than 5%
+	#
+	pctSlow=`$(GREP) -F 'pin::signal::total/slow' $(OBJDIR)then-stress.log | sed -e 's/.*norm: *\([0-9\.]*\).*/\1/'`; \
+	  $(BASHTEST) `expr $$pctSlow \< 0.05` -eq "1"
+	$(RM) $(OBJDIR)then-stress.log $(OBJDIR)then-stress.out
+
+# Test that we can call PIN_CallApplicationFunction() when there is a pending signal.  Previously, this would cause
+# a Pin crash.
+#
+call-app.test: $(OBJDIR)call-app$(EXE_SUFFIX) $(OBJDIR)call-app-tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)call-app-tool$(PINTOOL_SUFFIX) -- $(OBJDIR)call-app$(EXE_SUFFIX) > $(OBJDIR)call-app.out
+	$(CMP) $(OBJDIR)call-app.out call-app.reference
+	$(RM) $(OBJDIR)call-app.out
+
+# Stress test for calling PIN_CallApplicationFunction() while handling signals.
+#
+call-app-stress.test: $(OBJDIR)call-app-stress$(EXE_SUFFIX) $(OBJDIR)call-app-stress-tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)call-app-stress-tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)call-app-stress$(EXE_SUFFIX) > $(OBJDIR)call-app-stress.out
+	$(RM) $(OBJDIR)call-app-stress.out
+
+# This test causes a variety of different instructions to fault and makes sure that the signal context has
+# the expected register values at the time of the exception.  This variant of the "insfault" test runs
+# natively, so a failure indicates a problem with the test itself or with the kernel.
+#
+insfault-native.test: $(OBJDIR)insfault$(EXE_SUFFIX)
+	$(OBJDIR)insfault$(EXE_SUFFIX) > $(OBJDIR)insfault-native.out
+	$(RM) $(OBJDIR)insfault-native.out
+
+# This variant of the "insfault" test (see above) runs with Pin.  A failure here indicates a problem
+# with Pin's handling of faulty instructions.
+#
+insfault-notool.test: $(OBJDIR)insfault$(EXE_SUFFIX)
+	$(PIN) -- $(OBJDIR)insfault$(EXE_SUFFIX) > $(OBJDIR)insfault-notool.out
+	$(RM) $(OBJDIR)insfault-notool.out
+
+# This variant of the "insfault" test (see above) runs with a tool that puts a lot of pressure on the
+# register allocator.
+#
+insfault-pressure.test: $(OBJDIR)insfault$(EXE_SUFFIX) $(OBJDIR)reg-pressure-tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)reg-pressure-tool$(PINTOOL_SUFFIX) -- $(OBJDIR)insfault$(EXE_SUFFIX) > $(OBJDIR)insfault-pressure.out
+	$(RM) $(OBJDIR)insfault-pressure.out
+
+# This variant of the "insfault" test (see above) runs with a tool that rewrites the effective address of
+# every memory instruction.  A failure here indicates a problem with the API that rewrites memory operands
+# with respect to faulty instructions.
+#
+# NOTE: This test is disabled on Linux until Mantis #2471 is fixed.
+#
+insfault-rewrite.test: $(OBJDIR)insfault$(EXE_SUFFIX) $(OBJDIR)null-rewrite-tool$(PINTOOL_SUFFIX)
+	$(PIN) -t $(OBJDIR)null-rewrite-tool$(PINTOOL_SUFFIX) -- $(OBJDIR)insfault$(EXE_SUFFIX) > $(OBJDIR)insfault-rewrite.out
+	$(RM) $(OBJDIR)insfault-rewrite.out
+
+# This is like the "faultcheck-ia32" / "faultcheck-intel64" test, except that it
+# runs with a tool that inserts a lot of instrumentation.  The extra instrumentation
+# is a better stress test of Pin's ability to recover the precise exception state.
+#
+faultcheck-pressure.test: $(OBJDIR)faultcheck-$(TARGET)$(EXE_SUFFIX) $(OBJDIR)reg-pressure-tool$(PINTOOL_SUFFIX)
+	$(OBJDIR)faultcheck-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)faultcheck-pressure.out
+	$(PIN) -t $(OBJDIR)reg-pressure-tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)faultcheck-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)faultcheck-pressure.pin.out
+	$(CMP) $(OBJDIR)faultcheck-pressure.out $(OBJDIR)faultcheck-pressure.pin.out
+	$(RM) $(OBJDIR)faultcheck-pressure.out $(OBJDIR)faultcheck-pressure.pin.out
+
+alternate_stack_fork.test: $(OBJDIR)forktest_altstack$(EXE_SUFFIX)
+	$(OBJDIR)forktest_altstack$(EXE_SUFFIX) $(OBJDIR)alternate_stack_fork.log 2>  $(OBJDIR)alternate_stack_fork.out
+	$(PIN) -- $(OBJDIR)forktest_altstack$(EXE_SUFFIX) $(OBJDIR)alternate_stack_fork.pin.log \
+	  2> $(OBJDIR)alternate_stack_fork.pin.out 
+	$(SYNC)
+	$(CMP) $(OBJDIR)alternate_stack_fork.out $(OBJDIR)alternate_stack_fork.pin.out
+	$(RM) $(OBJDIR)alternate_stack_fork.out $(OBJDIR)alternate_stack_fork.pin.out
+	$(RM) $(OBJDIR)alternate_stack_fork.log $(OBJDIR)alternate_stack_fork.pin.log
+
+alternate_stack_thread.test: $(OBJDIR)threadtest_altstack$(EXE_SUFFIX)
+	$(OBJDIR)threadtest_altstack$(EXE_SUFFIX) > $(OBJDIR)alternate_stack_thread.out
+	$(PIN) -- $(OBJDIR)threadtest_altstack$(EXE_SUFFIX) > $(OBJDIR)alternate_stack_thread.pin.out
+	$(CMP) $(OBJDIR)alternate_stack_thread.out $(OBJDIR)alternate_stack_thread.pin.out
+	$(RM) $(OBJDIR)alternate_stack_thread.out $(OBJDIR)alternate_stack_thread.pin.out threadtest_altstack.log
+
+sigsegv_attach.test: $(OBJDIR)sigsegv_attach$(PINTOOL_SUFFIX) $(OBJDIR)sigsegv_attach_app$(EXE_SUFFIX) $(ATTACH_LAUNCHER)
+	$(ATTACH_LAUNCHER) $(PIN) -t $(OBJDIR)sigsegv_attach$(PINTOOL_SUFFIX) \
+	    -- $(OBJDIR)sigsegv_attach_app$(EXE_SUFFIX) > $(OBJDIR)sigsegv_attach.out
+	$(QGREP) "Caught signal SIGSEGV" $(OBJDIR)sigsegv_attach.out
+	$(RM) $(OBJDIR)sigsegv_attach.out
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special tools' build rules ######
+
+###### Special applications' build rules ######
+
+$(OBJDIR)xmmcheck_$(TARGET)$(EXE_SUFFIX): xmmcheck.c copywithxmm_$(TARGET)$(ASM_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)xmmfaultcheck_$(TARGET)$(EXE_SUFFIX): xmmfaultcheck.c copywithxmm_$(TARGET)$(ASM_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)syncasyncapp$(EXE_SUFFIX): syncasyncapp.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)resetsegv$(EXE_SUFFIX): resetsegv.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+$(OBJDIR)sigaltstack$(EXE_SUFFIX): sigaltstack.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS)
+
+# PIE makes it difficult to compare the two runs, therefore turn off PIE
+$(OBJDIR)faultcheck-$(TARGET)$(EXE_SUFFIX): faultcheck.c faultcheck-x86.c faultcheck-$(TARGET)-asm$(ASM_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ faultcheck.c faultcheck-x86.c $(ASMCPP) faultcheck-$(TARGET)-asm$(ASM_SUFFIX) \
+	  $(APP_LDFLAGS) $(LDFLAGS_DEFAULT_NO_PIE) $(APP_LIBS)
+
+$(OBJDIR)faultcheck_flags_ia32$(EXE_SUFFIX): faultcheck_flags.c  faultcheck_flags_ia32_asm$(ASM_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)movsbtest_$(TARGET)$(EXE_SUFFIX): movsbtest.c $(OBJDIR)movsbtest_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)hlt$(EXE_SUFFIX): hlt.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(LDFLAGS_DEFAULT_NO_PIE)
+
+$(OBJDIR)sigenableapp$(EXE_SUFFIX): sigenableapp.c sigenableapp2.c
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)dfcheck_$(TARGET)$(EXE_SUFFIX): dfcheck.c dfcheck_$(TARGET)$(ASM_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)fptags_ia32$(EXE_SUFFIX): fptags.c fptags_ia32$(ASM_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)bad-stack-$(TARGET)$(EXE_SUFFIX): bad-stack.c bad-stack-$(TARGET)-asm$(ASM_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ bad-stack.c $(ASMCPP) bad-stack-$(TARGET)-asm$(ASM_SUFFIX) $(APP_LDFLAGS) \
+	  $(APP_LIBS)
+
+$(OBJDIR)insfault$(EXE_SUFFIX): insfault.cpp insfault-$(TARGET_OS)-$(TARGET).cpp insfault-$(TARGET)-asm$(ASM_SUFFIX)
+	$(APP_CXX) $(COMPONENT_INCLUDES) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)handlerAlignment$(EXE_SUFFIX): handlerAlignment.cpp $(OBJDIR)handlerAlignment_asm$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)
+
+$(OBJDIR)sigsegv_attach_app$(EXE_SUFFIX): sigsegv_attach_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(CXX_LPATHS) $(CXX_LIBS)

@@ -1,0 +1,2071 @@
+#
+# Copyright (C) 2012-2021 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+###### Additional includes that are specific to this directory ######
+
+include $(TOOLS_ROOT)/Config/makefile.debug.rules
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS :=
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS :=
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS :=
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place OS-specific definitions here ######
+
+
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS += stop-resume-when-suspended check-if-thread-stopped
+    TEST_ROOTS += check-ftag simple-pindb-launch pindb-start-fini pindb-noprompt-kill pindb-detach pindb-abrupt-disconnect \
+                  pindb-kill-like-gdb pindb-simple-command pindb-step-custom-break pindb-simultaneous-toolbreak \
+                  pindb-simultaneous-toolbreak-serialize pindb-simultaneous-toolbreak-squash pindb-invalidate-regs \
+                  pindb-simultaneous-toolbreak-change pindb-simultaneous-toolbreak-step pindb-simple-simultaneous-multi \
+                  pindb-simple-simultaneous-multi-serialize simple execfail fork breaktool breaktool_const_context \
+                  breaktool-wait breaktool-nodebugger bp-icount action-pending thread launch-gdb stack-debugger pindb-zmm \
+                  debugger-shell-breakpoints debugger-shell-tracepoints start-fini intercept-breakpoint emu-simple ymm zmm \
+                  pc-change-bp pc-change-async interpreter-remove mt-exit debugger-type signal-step siginfo xmm-$(TARGET) \
+                  pindb-attach-after-custom-stop allow-remote set-mode gdb-detach-reattach invalid-write bptest-$(TARGET) \
+                  pindb-pthread-step-exit gdb-pthread-step-exit pindb-pthread-cont-exitgroup pindb-pthread-step-exitgroup \
+                  simultaneous-toolbreak simultaneous-toolbreak-squash simultaneous-toolbreak-change \
+                  simultaneous-toolbreak-attach pindb-simultaneous-multi pindb-simultaneous-multi-serialize \
+                  pindb-simultaneous-toolbreak-attach launch-gdb_const_context ymm_with_set_xmm_scratch_regs_tool \
+                  watchpoint_const_context simultaneous-toolbreak_const_context \
+                  xmm-$(TARGET)_with_set_xmm_scratch_regs_before_breakpoint_tool \
+                  xmm-$(TARGET)_with_set_xmm_scratch_regs_before_breakpoint_tool_const_context \
+                  xmm-$(TARGET)_with_set_xmm_scratch_regs_before_breakpoint_tool_and_set_xmm_reg \
+                  app-pause-in-app-thread app-pause-in-int-thread bphandler gdb-svr4-libraries-extension simple-pindb-attach
+    TOOL_ROOTS += stack-debugger start-fini-callback simple-command-tool use-debugger-shell simultaneous-toolbreak \
+                  breaktool int3-count action-pending-tool checkpoint watchpoint launch-gdb-tool intercept-tool \
+                  pc-change-async-tool interpreter-remove mt-exit-tool debugger-type set-mode-tool invalidate-regs \
+                  set_xmm_scratches set_xmm_scratches_before_breakpoint set_xmm_scratches_before_breakpoint_and_set_xmm_reg \
+                  set_xmm_scratches_for_ymmtest null-emulator-$(TARGET) \
+                  app-pause-in-app-thread-tool app-pause-in-int-thread-tool library-load-tool
+    APP_ROOTS += check-ftag simple-pindb simple simple-static exec fork action-pending-app thread checkpoint-app bptest-$(TARGET) \
+                 watchpoint-app callerapp fibonacci sleep-unix intercept-app pc-change-bp pc-change-async xmm-$(TARGET) \
+                 mt-exit signal-catch reattach-loop pthread-bare-exit pthread-bare-exitgroup thread-$(OS_TYPE) \
+                 ymm-$(TARGET) zmm-$(TARGET) debugger-shell-app-$(TARGET) app-pause-app pick-random-port bphandler_app \
+                 dlopen-dlclose
+    OBJECT_ROOTS += check-ftag_asm simple-pindb-asm-$(TARGET) zmm-asm-$(TARGET)
+    ifeq ($(TARGET),ia32)
+        TEST_ROOTS += access-64-on-32
+    endif
+endif
+
+# macOS*
+ifeq ($(TARGET_OS),mac)
+    TEST_ROOTS += check-ftag app-pause-in-app-thread app-pause-in-int-thread \
+                  simple-pindb-launch pindb-start-fini pindb-noprompt-kill pindb-detach pindb-abrupt-disconnect \
+                  pindb-kill-like-gdb pindb-simple-command pindb-step-custom-break pindb-simultaneous-toolbreak \
+                  pindb-simultaneous-toolbreak-serialize pindb-simultaneous-toolbreak-squash pindb-invalidate-regs \
+                  pindb-simultaneous-toolbreak-change pindb-simultaneous-toolbreak-step pindb-simple-simultaneous-multi \
+                  pindb-simple-simultaneous-multi-serialize pindb-pthread-step-exit pindb-pthread-cont-exitgroup \
+                  pindb-pthread-step-exitgroup pindb-simultaneous-multi pindb-simultaneous-multi-serialize pindb-zmm \
+                  simple execfail fork breaktool bphandler stack-debugger debugger-type simple-pindb-attach
+# pindb-attach-after-custom-stop pindb-simultaneous-toolbreak-attach
+    TOOL_ROOTS += app-pause-in-app-thread-tool app-pause-in-int-thread-tool default_mac_tool simple-command-tool \
+                  invalidate-regs use-debugger-shell breaktool bphandler stack-debugger debugger-type
+    APP_ROOTS += check-ftag app-pause-app simple simple-pindb thread-$(OS_TYPE) pthread-bare-exit pthread-bare-exitgroup \
+    			 zmm-$(TARGET) bphandler_app fibonacci
+    OBJECT_ROOTS += check-ftag_asm simple-pindb-asm-$(TARGET) zmm-asm-$(TARGET)
+endif
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    TEST_TOOL_ROOTS += stop-resume-when-suspended check-if-thread-stopped
+    TEST_ROOTS += simple-pindb-launch pindb-start-fini pindb-noprompt-kill pindb-detach pindb-abrupt-disconnect \
+                  pindb-kill-like-gdb pindb-simple-command pindb-step-custom-break pindb-simultaneous-toolbreak \
+                  pindb-simultaneous-toolbreak-serialize pindb-simultaneous-toolbreak-squash pindb-invalidate-regs \
+                  pindb-simultaneous-toolbreak-change pindb-simultaneous-toolbreak-step pindb-simple-simultaneous-multi \
+                  pindb-simple-simultaneous-multi-serialize pindb-win-unhandled-exception pindb-win-handled-exception \
+                  pindb-win-continued-exception1 pindb-win-continued-exception2 pindb-win-software-exception \
+                  pindb-win-cpp-exception pindb-win-squash-exception pindb-win-step-exception pindb-zmm \
+                  pindb-win-library-notifications pindb-win-step-library pindb-win-thread-stress \
+                  pindb-win-exception-after-exit app-pause-in-app-thread app-pause-in-int-thread simple-pindb-attach
+    TOOL_ROOTS += stack-debugger start-fini-callback simple-command-tool use-debugger-shell simultaneous-toolbreak \
+                  invalidate-regs app-pause-in-app-thread-tool app-pause-in-int-thread-tool
+    APP_ROOTS += simple-pindb simple win-unhandled-exception win-handled-exception win-continued-exception1 \
+                 win-continued-exception2 win-software-exception win-cpp-exception win-load-library \
+                 win-thread-stress thread-$(OS_TYPE) app-pause-app win-exception-after-exit zmm-$(TARGET)
+    OBJECT_ROOTS += simple-pindb-asm-$(TARGET) win-foo-library zmm-asm-$(TARGET)
+    DLL_ROOTS += win-foo-library win-exception-after-exit-dll
+    ifeq ($(TARGET),ia32)
+        TEST_ROOTS += access-64-on-32
+    endif
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+# Check if machine support AVX
+ifneq ($(TARGET_HAS_DEPENDENCIES),)
+    ifeq ($(wildcard $(CHECKAVX)),)
+        $(error Unable to proceed. Run "make avxcheck", then try again)
+    else
+        MACHINE_SUPPORTS_AVX_INSTRUCTIONS := $(shell $(CHECKAVX) | $(GREP) Yes)
+    endif
+endif
+
+# For machines that don't support AVX, exclude these tests as they contain hard coded AVX
+# instructions that result with illegal instruction.
+ifneq ($(MACHINE_SUPPORTS_AVX_INSTRUCTIONS),Yes)
+    TEST_ROOTS := $(filter-out ymm_with_set_xmm_scratch_regs_tool ymm, $(TEST_ROOTS))
+endif
+
+ifeq ($(TARGET_OS),linux)
+
+    ifeq ($(shell $(TOOLS_ROOT)/Utils/testStaticLibs), 1)
+        TEST_ROOTS := $(filter-out bp-icount, $(TEST_ROOTS))
+        TOOL_ROOTS := $(filter-out int3-count, $(TOOL_ROOTS))
+        APP_ROOTS := $(filter-out simple-static, $(APP_ROOTS))
+    endif
+
+    GDB_VERSION_IF_BEFORE_66 := $(shell $(TOOLS_ROOT)/Utils/testToolVersion $(GDB) le 6.6)
+    GDB_VERSION_IF_BEFORE_74 := $(shell $(TOOLS_ROOT)/Utils/testToolVersion $(GDB) le 7.4)
+    GDB_VERSION_IF_BEFORE_80 := $(shell $(TOOLS_ROOT)/Utils/testToolVersion $(GDB) le 8.0)
+    ifeq ($(GDB_VERSION_IF_BEFORE_66),1)
+#   Versions of gdb older than 6.6 do not understand the XMM registers, so disable the xmm tests.
+#
+        TEST_ROOTS := $(filter-out xmm-$(TARGET) xmm-$(TARGET)_with_set_xmm_scratch_regs_before_breakpoint_tool \
+                                   xmm-$(TARGET)_with_set_xmm_scratch_regs_before_breakpoint_tool_const_context \
+                                   xmm-$(TARGET)_with_set_xmm_scratch_regs_before_breakpoint_tool_and_set_xmm_reg, \
+                                   $(TEST_ROOTS))
+        TOOL_ROOTS := $(filter-out set_xmm_scratches_before_breakpoint \
+                                   set_xmm_scratches_before_breakpoint_and_set_xmm_reg set_xmm_scratches, $(TOOL_ROOTS))
+        APP_ROOTS := $(filter-out xmm-$(TARGET), $(APP_ROOTS))
+    endif
+    ifeq ($(GDB_VERSION_IF_BEFORE_74),1)
+#   Versions of gdb older than 7.4 do not understand svr4 libraries query
+#
+        TEST_ROOTS := $(filter-out gdb-svr4-libraries-extension, $(TEST_ROOTS))
+        TOOL_ROOTS := $(filter-out library-load-tool, $(TOOL_ROOTS))
+        APP_ROOTS := $(filter-out dlopen-dlclose, $(APP_ROOTS))
+    endif
+    ifeq ($(GDB_VERSION_IF_BEFORE_80),1)
+#   Versions of gdb older than 8.0 do not support AVX512 registers
+#
+        TEST_ROOTS := $(filter-out zmm, $(TEST_ROOTS))
+    endif
+endif
+
+
+RUNNABLE_TESTS := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+###### Handle exceptions here (bugs related) ######
+
+ifeq ($(TARGET_OS),windows)
+    # This test is disabled until Mantis 1839 is fixed.
+    TEST_ROOTS := $(filter-out simple-pindb-attach, $(TEST_ROOTS))
+    # This test is disabled until Mantis 4566 is fixed
+    TEST_TOOL_ROOTS := $(filter-out stop-resume-when-suspended, $(TEST_TOOL_ROOTS))
+endif
+
+ifeq ($(TARGET_OS),linux)
+    # see mantis 4779 debugger update caused 32 bit to fail on ubuntu 18.04
+    # threrefore we filter them till debugger is fixed
+    FILTER_DEBUG_32BIT := 0
+    ifeq ($(TARGET),ia32)
+      ifeq ($(DIST_NAME_UBUNTU),1)
+        FILTER_DEBUG_32BIT := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion eq 18.04)
+      endif
+    endif
+    ifeq ($(FILTER_DEBUG_32BIT),1)
+        TEST_ROOTS := $(filter-out action-pending allow-remote bphandler bptest-ia32 breaktool_const_context breaktool-wait breaktool \
+                                   debugger-shell-breakpoints debugger-shell-tracepoints emu-simple execfail fork gdb-detach-reattach \
+                                   gdb-pthread-step-exit intercept-breakpoint pc-change-async pc-change-bp set-mode siginfo signal-step simple \
+                                   simultaneous-toolbreak_const_context simultaneous-toolbreak-change simultaneous-toolbreak-squash \
+                                   simultaneous-toolbreak stack-debugger thread watchpoint_const_context \
+                                   xmm-ia32_with_set_xmm_scratch_regs_before_breakpoint_tool_and_set_xmm_reg \
+                                   xmm-ia32_with_set_xmm_scratch_regs_before_breakpoint_tool_const_context \
+                                   xmm-ia32_with_set_xmm_scratch_regs_before_breakpoint_tool xmm-ia32 \
+                                   ymm_with_set_xmm_scratch_regs_tool ymm zmm , $(TEST_ROOTS))
+    endif 
+endif
+
+# There is a bug with PinADX when using early-injection (the default) on 32-bit applications when running
+# on a 64-bit host and when using versions of Windows earlier than Vista.  That bug causes this test to
+# fail, so we disable it in this case.  We can re-enable this test when Mantis #2385 is fixed.
+#
+osname := $(shell uname -s)
+ifeq ($(findstring CYGWIN_NT-5,$(osname))-$(HOST_ARCH)-$(TARGET),CYGWIN_NT-5-intel64-ia32)
+    TEST_ROOTS := $(filter-out pindb-start-fini, $(TEST_ROOTS))
+endif
+
+ifeq ($(TARGET_OS),linux)
+    # See mantis 4613
+    TEST_ROOTS := $(filter-out gdb-svr4-libraries-extension, $(TEST_ROOTS))
+    
+    SKIP_DBG_TESTS = 0
+    ifeq ($(TARGET),ia32)
+        ifeq ($(DIST_NAME_RHEL),1)
+            DIST_VER_GE_75 := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion ge 7.5)
+            ifeq ($(DIST_VER_GE_75),1)
+                SKIP_DBG_TESTS = 1
+            endif
+        endif
+        ifeq ($(DIST_NAME_CENTOS),1)
+            # In CentOS 7.8, VERSION has a value of 7 and not 7.8
+            DIST_VER_GE_7 := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion ge 7)
+            ifeq ($(DIST_VER_GE_7),1)
+                SKIP_DBG_TESTS = 1
+            endif
+        endif
+    endif
+            
+    ifeq ($(SKIP_DBG_TESTS),1)
+        # Disable 32 bit tests on rhel7.5 & rhel7.6 & rhel7.8, Centos7.8 - see mantis 4677
+        TEST_ROOTS := $(filter-out action-pending allow-remote bphandler bptest-ia32 breaktool_const_context \
+                          breaktool-wait breaktool debugger-shell-breakpoints debugger-shell-tracepoints execfail fork \
+                          gdb-detach-reattach gdb-pthread-step-exit intercept-breakpoint invalid-write pc-change-async \
+                          pc-change-bp set-mode siginfo signal-step simple simultaneous-toolbreak_const_context \
+                          simultaneous-toolbreak-change simultaneous-toolbreak-squash simultaneous-toolbreak \
+                          stack-debugger thread watchpoint_const_context \
+                          xmm-ia32_with_set_xmm_scratch_regs_before_breakpoint_tool_and_set_xmm_reg \
+                          xmm-ia32_with_set_xmm_scratch_regs_before_breakpoint_tool_const_context \
+                          xmm-ia32_with_set_xmm_scratch_regs_before_breakpoint_tool xmm-ia32 \
+                          ymm_with_set_xmm_scratch_regs_tool ymm pindb-simultaneous-toolbreak check-ftag, $(TEST_ROOTS))
+    endif
+endif
+
+# See mantis 4570
+ifeq ($(TARGET_OS),windows)
+    TEST_ROOTS := $(filter-out pindb-zmm, $(TEST_ROOTS))
+endif
+
+# see mantis 4821
+ifeq ($(TARGET_OS),linux)
+    ifeq ($(DIST_NAME_UBUNTU),1)
+        DIST_VER_GE_1910 := $(shell $(TOOLS_ROOT)/Utils/testLinuxDistVersion ge 19.10)
+        ifeq ($(DIST_VER_GE_1910),1)
+            TEST_ROOTS := $(filter-out bphandler fork gdb-detach-reattach, $(TEST_ROOTS))
+            APP_ROOTS := $(filter-out bphandler_app, $(APP_ROOTS))
+        endif
+    endif
+endif
+
+ifeq ($(TARGET_OS),mac)
+    # See mantis 4602
+    TEST_ROOTS := $(filter-out pindb-invalidate-regs, $(TEST_ROOTS))
+    
+    # See mantis 4834
+    TEST_ROOTS := $(filter-out pindb-abrupt-disconnect pindb-kill-like-gdb pindb-noprompt-kill pindb-zmm, $(TEST_ROOTS))
+endif
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+ifeq ($(TARGET_OS),mac)
+    # See mantis 4598
+    SANITY_SUBSET := $(filter-out pindb-simultaneous-toolbreak pindb-simultaneous-toolbreak-serialize \
+                                  pindb-simultaneous-toolbreak-squash pindb-simultaneous-toolbreak-change \
+                                  pindb-simultaneous-toolbreak-step, $(SANITY_SUBSET))
+
+    # See mantis 4679
+    SANITY_SUBSET := $(filter-out pindb-simultaneous-multi-serialize, $(SANITY_SUBSET))
+endif
+
+ifeq ($(TARGET_OS),linux)
+	# see mnatis 4903 - this test fails intermittently on Linux
+    SANITY_SUBSET := $(filter-out ymm_with_set_xmm_scratch_regs_tool, $(SANITY_SUBSET))
+endif
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+# This is a time limit (in seconds) we use for some of the tests below.  It's intentionally high
+# to avoid timeouts when the system load is very high, which can happen in our nightly tests.
+#
+
+TLIMIT := 120
+
+ifeq ($(TARGET_OS),mac)
+    BATCH_CMD_CONNECT_REMOTE :=gdb-remote
+    BATCH_CMD_TIMEOUT_LIMIT:=
+    DBG:=lldb
+    DBG_STR:=$(DBG)
+    DBG_CMD_SRC_FLAG:=-s
+    DBG_CMD_MORE_FLAGS:=-x --batch
+    DEFAULT_TOOL:=$(OBJDIR)default_mac_tool$(PINTOOL_SUFFIX)
+    PIN_CMD_DEFAULT_TOOL:= -t $(DEFAULT_TOOL)
+    COMPARE_RE_FILE_SUFFIX:=.lldb 
+endif
+ifeq ($(TARGET_OS),linux)
+    BATCH_CMD_CONNECT_REMOTE :=target remote
+    BATCH_CMD_TIMEOUT_LIMIT:= set remotetimeout $(TLIMIT)
+    DBG:=$(GDB)
+    DBG_STR:=gdb
+    DBG_CMD_SRC_FLAG=-x
+    DBG_CMD_MORE_FLAGS:=-n -batch
+    COMPARE_RE_FILE_SUFFIX:=
+endif
+
+# This is the example tool from the manual run such that you can attach the debugger after it triggers a stack
+# breakpoint.
+#
+stack-debugger-late.test: $(OBJDIR)fibonacci$(EXE_SUFFIX) $(OBJDIR)stack-debugger$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.toolout)
+	$(PIN) $(PINFLAGS_DEBUG_RUNFREE) -appdebug_silent -t $(OBJDIR)stack-debugger$(PINTOOL_SUFFIX) \
+	  -stackbreak 4000 -o $(OBJDIR)$(@:.test=.toolout) -timeout $(TLIMIT) \
+	    -- $(OBJDIR)fibonacci$(EXE_SUFFIX) 1000 > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.toolout) > /dev/null 2>&1 || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.toolout) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)fibonacci$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.toolout) $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Basic test of debugger features.
+#
+simple.test: $(OBJDIR)simple$(EXE_SUFFIX) $(DEFAULT_TOOL)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) $(PIN_CMD_DEFAULT_TOOL) -- $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Basic test for breakpoint handling features.
+#
+bphandler.test: $(OBJDIR)bphandler$(PINTOOL_SUFFIX) $(OBJDIR)bphandler_app$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)bphandler$(PINTOOL_SUFFIX) -- $(OBJDIR)bphandler_app$(EXE_SUFFIX) > \
+      $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)bphandler_app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Verify we can debug across a failed exec() call.
+#
+execfail.test: $(OBJDIR)exec$(EXE_SUFFIX) $(DEFAULT_TOOL)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -follow_execv $(PIN_CMD_DEFAULT_TOOL) -- $(OBJDIR)exec$(EXE_SUFFIX) ./does-not-exist > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)exec$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+
+#Test that Pin delivers the correct ftag value to the debugger (16 bits instead of 8 bits).
+check-ftag.test: $(OBJDIR)check-ftag$(EXE_SUFFIX) $(DEFAULT_TOOL)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) $(PIN_CMD_DEFAULT_TOOL) -- $(OBJDIR)check-ftag$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)check-ftag$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=-)$(TARGET_OS).compare -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f  $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+
+
+# Verify we can debug across a parent call to fork().
+#
+fork.test: $(OBJDIR)fork$(EXE_SUFFIX) $(DEFAULT_TOOL)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) $(PIN_CMD_DEFAULT_TOOL) -- $(OBJDIR)fork$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)fork$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Basic test of PIN_ApplicationBreakpoint()
+#
+breaktool.test: $(OBJDIR)simple$(EXE_SUFFIX) $(OBJDIR)breaktool$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)breaktool$(PINTOOL_SUFFIX) -wait_for_debugger 0 \
+	  -- $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+breaktool_const_context.test: $(OBJDIR)simple$(EXE_SUFFIX) $(OBJDIR)breaktool$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)breaktool$(PINTOOL_SUFFIX) -wait_for_debugger 0 -const_context 1 \
+	  -- $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Verify that PIN_ApplicationBreakpoint(.., TRUE, ..) will wait if there's no debugger.
+#
+breaktool-wait.test: $(OBJDIR)simple$(EXE_SUFFIX) $(OBJDIR)breaktool$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG_RUNFREE) \
+	  -t $(OBJDIR)breaktool$(PINTOOL_SUFFIX) -wait_for_debugger 1 -port $(OBJDIR)$(@:.test=.out) \
+	    -- $(OBJDIR)simple$(EXE_SUFFIX) &
+	count=0; \
+	until $(BASHTEST) -s $(OBJDIR)$(@:.test=.out) -o $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	sleep 5
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	port=`cat $(OBJDIR)$(@:.test=.out)`; echo "target remote :$$port" >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Verify that PIN_ApplicationBreakpoint(.., FALSE, ..) does not wait if there's no debugger.
+#
+breaktool-nodebugger.test: $(OBJDIR)simple$(EXE_SUFFIX) $(OBJDIR)breaktool$(PINTOOL_SUFFIX)
+	$(PIN) $(PINFLAGS_DEBUG_RUNFREE) -t $(OBJDIR)breaktool$(PINTOOL_SUFFIX) -wait_for_debugger 0 \
+	  -- $(OBJDIR)simple$(EXE_SUFFIX)
+
+# Test breakpoints in various circumstances.
+#
+bptest-$(TARGET).test: $(OBJDIR)bptest-$(TARGET)$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -- $(OBJDIR)bptest-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)bptest-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.)$(COMPARE_EXT) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test that breakpoints do not cause the tool to see any extra instructions (e.g. INT3).
+#
+bp-icount.test: $(OBJDIR)simple-static$(EXE_SUFFIX) $(OBJDIR)int3-count$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) -t $(OBJDIR)int3-count$(PINTOOL_SUFFIX) -func main -o $(OBJDIR)bp-icount.reference \
+	  -- $(OBJDIR)simple-static$(EXE_SUFFIX)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)int3-count$(PINTOOL_SUFFIX) -func main -o $(OBJDIR)bp-icount.count \
+	  -- $(OBJDIR)simple-static$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)simple-static$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(CMP) $(OBJDIR)bp-icount.reference $(OBJDIR)bp-icount.count
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test the PIN_IsActionPending() API.
+#
+action-pending.test: $(OBJDIR)action-pending-app$(EXE_SUFFIX) $(OBJDIR)action-pending-tool$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)action-pending-tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)action-pending-app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)action-pending-app$(EXE_SUFFIX) \
+	  > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test that we can print out XMM registers.  Older GDB's don't know how to print XMM registers well,
+# so use a modern GDB for this test.
+#
+# We first test that GDB itself will run.  If not, we just skip the body of this test.  The modern
+# GDB won't run on some old test systems.
+#
+xmm-$(TARGET).test: $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -- $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+xmm-$(TARGET)_with_set_xmm_scratch_regs_before_breakpoint_tool.test: $(OBJDIR)set_xmm_scratches_before_breakpoint$(PINTOOL_SUFFIX) $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)set_xmm_scratches_before_breakpoint$(PINTOOL_SUFFIX) \
+	  -output_filename $(OBJDIR)set_xmm_scratches_before_breakpoint.out \
+	    -- $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || test $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(QGREP) "$$1 = 0x[0]*3f800000" $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "$$2 = 0x[0]*40000000" $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "$$3 = 0xff00ff000a550a55123456789abcdef0" $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "exited normally." $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "instrumented the movdqa" $(OBJDIR)set_xmm_scratches_before_breakpoint.out
+	$(QGREP) "did setApplicationBreakpoint" $(OBJDIR)set_xmm_scratches_before_breakpoint.out
+	$(QGREP) "regular_context" $(OBJDIR)set_xmm_scratches_before_breakpoint.out
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)set_xmm_scratches_before_breakpoint.out
+
+xmm-$(TARGET)_with_set_xmm_scratch_regs_before_breakpoint_tool_const_context.test: $(OBJDIR)set_xmm_scratches_before_breakpoint$(PINTOOL_SUFFIX) $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN)  $(PINFLAGS_DEBUG) -t $(OBJDIR)set_xmm_scratches_before_breakpoint$(PINTOOL_SUFFIX) \
+	  -output_filename $(OBJDIR)set_xmm_scratches_before_breakpoint_const_context.out -const_context 1 \
+	    -- $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || test $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(QGREP) "$$1 = 0x[0]*3f800000" $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "$$2 = 0x[0]*40000000" $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "$$3 = 0xff00ff000a550a55123456789abcdef0" $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "exited normally." $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "instrumented the movdqa" $(OBJDIR)set_xmm_scratches_before_breakpoint_const_context.out
+	$(QGREP) "did setApplicationBreakpoint" $(OBJDIR)set_xmm_scratches_before_breakpoint_const_context.out
+	$(QGREP) "const_context" $(OBJDIR)set_xmm_scratches_before_breakpoint_const_context.out
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)set_xmm_scratches_before_breakpoint_const_context.out
+
+xmm-$(TARGET)_with_set_xmm_scratch_regs_before_breakpoint_tool_and_set_xmm_reg.test: $(OBJDIR)set_xmm_scratches_before_breakpoint_and_set_xmm_reg$(PINTOOL_SUFFIX) $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN)  $(PINFLAGS_DEBUG) -t $(OBJDIR)set_xmm_scratches_before_breakpoint_and_set_xmm_reg$(PINTOOL_SUFFIX) \
+	  -output_filename $(OBJDIR)set_xmm_scratch_regs_before_breakpoint_tool_set_xmm_reg.out \
+	    -- $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || test $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(QGREP) "$$1 = 0x[0]*3f800000" $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "$$2 = 0x[0]*40000000" $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "$$3 = 0xff00ff000a550a55123456789abcdef0" $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "$$4 = 0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a" $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "exited normally." $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) "instrumented the movdqa" $(OBJDIR)set_xmm_scratch_regs_before_breakpoint_tool_set_xmm_reg.out
+	$(QGREP) "tool got the expected gdb command" $(OBJDIR)set_xmm_scratch_regs_before_breakpoint_tool_set_xmm_reg.out
+	$(QGREP) "tool properly set xmm3" $(OBJDIR)set_xmm_scratch_regs_before_breakpoint_tool_set_xmm_reg.out
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)set_xmm_scratch_regs_before_breakpoint_tool_set_xmm_reg.out
+
+xmm-$(TARGET)_with_set_xmm_scratch_regs_tool.test: $(OBJDIR)set_xmm_scratches$(PINTOOL_SUFFIX) $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN)  $(PINFLAGS_DEBUG) -t $(OBJDIR)set_xmm_scratches$(PINTOOL_SUFFIX) \
+	  -output_filename $(OBJDIR)set_xmm_scratches.out \
+	    -- $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || test $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(QGREP) instrumented $(OBJDIR)set_xmm_scratches.out
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)set_xmm_scratches.out
+
+# Simple test of a threaded program.
+#
+thread.test: $(OBJDIR)thread$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -- $(OBJDIR)thread$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat thread.$(DBG_STR) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)thread$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p thread.compare -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Simple test of a threaded program built statically (uses non-nptl thread package on Linux).
+# NOTE: This test is disabled, so it does not run automatically.  Modern versions of GDB do not
+#   support non-nptl threads well.
+#
+thread-static.test: $(OBJDIR)thread-static$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -- $(OBJDIR)thread-static$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat thread.$(DBG_STR) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)thread-static$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p thread.compare -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Simple test of the 'pindb' debugger.  We launch Pin separatly and pindb attaches.
+#
+simple-pindb-attach.test: $(OBJDIR)simple-pindb$(EXE_SUFFIX) $(OBJDIR)stack-debugger$(PINTOOL_SUFFIX)
+	$(OBJDIR)simple-pindb$(EXE_SUFFIX) basic $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.compare)
+	$(PYTHON) launch-pin-attach-debugger.py --pin=$(BARE_PIN) --pin-exe=$(BARE_PIN) \
+	    --pindb=$(PINDB) --pindb-libpath=$(PINDB_LIBPATH) \
+	    --tool=$(OBJDIR)stack-debugger$(PINTOOL_SUFFIX) --app=$(OBJDIR)simple-pindb$(EXE_SUFFIX) \
+	    --cpu=$(TARGET) --timeout=$(TLIMIT) \
+	    --pin-out=$(OBJDIR)$(@:.test=.out) --pindb-in=$(OBJDIR)$(@:.test=.pindbin) \
+	    --pindb-out=$(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(OBJDIR)$(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.compare) $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.pindbout)
+
+# Simple test of the 'pindb' debugger.  We use the pindb "run" command to launch and attach to pin.
+#
+simple-pindb-launch.test: $(OBJDIR)simple-pindb$(EXE_SUFFIX) $(OBJDIR)stack-debugger$(PINTOOL_SUFFIX)
+	$(OBJDIR)simple-pindb$(EXE_SUFFIX) basic $(OBJDIR)$(@:.test=.pindbin.0) $(OBJDIR)$(@:.test=.compare)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)stack-debugger$(PINTOOL_SUFFIX)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)simple-pindb$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(OBJDIR)$(@:.test=.pindbin.0) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(OBJDIR)$(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin.0) $(OBJDIR)$(@:.test=.compare) $(OBJDIR)$(@:.test=.pindbout) \
+	      $(OBJDIR)$(@:.test=.pindbin)
+
+# Test the checkpoint tool.
+#
+checkpoint.test: $(OBJDIR)checkpoint-app$(EXE_SUFFIX) $(OBJDIR)checkpoint$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)checkpoint$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)checkpoint-app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)checkpoint-app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p checkpoint-gdb.compare -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p checkpoint-app.compare -c $(OBJDIR)$(@:.test=.out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test the watchpoint tool.
+#
+watchpoint.test: $(OBJDIR)watchpoint-app$(EXE_SUFFIX) $(OBJDIR)watchpoint$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(OBJDIR)watchpoint-app 1 > $(OBJDIR)$(@:.test=.$(DBG_STR))
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)watchpoint$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)watchpoint-app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(OBJDIR)$(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)watchpoint-app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out) $(OBJDIR)$(@:.test=.$(DBG_STR))
+
+watchpoint_const_context.test: $(OBJDIR)watchpoint-app$(EXE_SUFFIX) $(OBJDIR)watchpoint$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(OBJDIR)watchpoint-app$(EXE_SUFFIX) 1 > $(OBJDIR)$(@:.test=.$(DBG_STR))
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)watchpoint$(PINTOOL_SUFFIX) -const_context 1 \
+	  -- $(OBJDIR)watchpoint-app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || test $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(OBJDIR)$(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)watchpoint-app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out) $(OBJDIR)$(@:.test=.$(DBG_STR))
+
+# This test starts Pin with debugger support enabled, but Pin does not stop at
+# the first instruction waiting for a debugger to attach.  Instead, the
+# application runs under Pin immediately.  Later, if the tool finds something
+# interesting, it can ask the user (or a GUI shell) to start the debugger and
+# attach at the interesting point.
+#
+launch-gdb.test: $(OBJDIR)callerapp$(EXE_SUFFIX) $(OBJDIR)launch-gdb-tool$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(PIN) $(PINFLAGS_DEBUG_RUNFREE) -t $(OBJDIR)launch-gdb-tool$(PINTOOL_SUFFIX) -timeout $(TLIMIT) \
+	  -o $(OBJDIR)$(@:.test=.$(DBG_STR)in) -- $(OBJDIR)callerapp$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.$(DBG_STR)in) > /dev/null 2>&1 || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)callerapp$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# This tests the -appdebug_server_port <PORT> option of PIN.
+# We pick an available TCP port randomly, then we run PIN with -appdebug_server_port specifying the random port
+# We expect to connect with GDB to the port we specified
+#
+gdb-fixed-port.test: $(OBJDIR)callerapp$(EXE_SUFFIX) $(OBJDIR)launch-gdb-tool$(PINTOOL_SUFFIX) $(OBJDIR)pick-random-port$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(OBJDIR)pick-random-port$(EXE_SUFFIX) unused > $(OBJDIR)$(@:.test=.random)
+	$(PIN) $(PINFLAGS_DEBUG_RUNFREE) -appdebug_server_port `cat $(OBJDIR)$(@:.test=.random)` -t $(OBJDIR)launch-gdb-tool$(PINTOOL_SUFFIX) -timeout $(TLIMIT) \
+	  -o $(OBJDIR)$(@:.test=.$(DBG_STR)in) -- $(OBJDIR)callerapp$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) 'target remote :'`cat $(OBJDIR)$(@:.test=.random)` $(OBJDIR)$(@:.test=.$(DBG_STR)in) > /dev/null 2>&1 || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)callerapp$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# This tests the -appdebug_server_port <PORT> option of PIN when we.
+# provide a port which is already taken by another application
+# We expect PIN to fail because it won't acquire the port
+#
+gdb-fixed-port-used.test: $(OBJDIR)callerapp$(EXE_SUFFIX) $(OBJDIR)launch-gdb-tool$(PINTOOL_SUFFIX) $(OBJDIR)pick-random-port$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(OBJDIR)pick-random-port$(EXE_SUFFIX) used > $(OBJDIR)$(@:.test=.random)
+	! ( $(PIN) $(PINFLAGS_DEBUG_RUNFREE) -appdebug_server_port `cat $(OBJDIR)$(@:.test=.random)` -t $(OBJDIR)launch-gdb-tool$(PINTOOL_SUFFIX) \
+	    -timeout $(TLIMIT) -o $(OBJDIR)$(@:.test=.$(DBG_STR)in) -- $(OBJDIR)callerapp$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) )
+	$(QGREP) "E:Unable to create debugger connection" $(OBJDIR)$(@:.test=.out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.random)
+
+# This tests the -appdebug_server_port <PORT> option of PIN when we
+# provide an invalid TCP port number.
+# We expect PIN to fail because the TCP port number is invalid
+#
+gdb-fixed-bad-port.test: $(OBJDIR)callerapp$(EXE_SUFFIX) $(OBJDIR)launch-gdb-tool$(PINTOOL_SUFFIX) $(OBJDIR)pick-random-port$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	! ( $(PIN) $(PINFLAGS_DEBUG_RUNFREE) -appdebug_server_port 100000 -t $(OBJDIR)launch-gdb-tool$(PINTOOL_SUFFIX) \
+	    -timeout $(TLIMIT) -o $(OBJDIR)$(@:.test=.$(DBG_STR)in) -- $(OBJDIR)callerapp$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) )
+	$(QGREP) "E:Invalid TCP server port: 100000" $(OBJDIR)$(@:.test=.out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+
+launch-gdb_const_context.test: $(OBJDIR)callerapp$(EXE_SUFFIX) $(OBJDIR)launch-gdb-tool$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(PIN) $(PINFLAGS_DEBUG_RUNFREE) -t $(OBJDIR)launch-gdb-tool$(PINTOOL_SUFFIX) -const_context 1 -timeout $(TLIMIT) \
+	  -o $(OBJDIR)$(@:.test=.$(DBG_STR)in) -- $(OBJDIR)callerapp$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.$(DBG_STR)in) > /dev/null 2>&1 || test $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)callerapp$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# This is the example tool we describe in the manual, which demonstrates the major features
+# of the application-level debugging API.  The tool tracks the application's stack usage
+# and allows breakpoints to be set when the stack usage crosses a threshold.
+#
+stack-debugger.test: $(OBJDIR)fibonacci$(EXE_SUFFIX) $(OBJDIR)stack-debugger$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)stack-debugger$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)fibonacci$(EXE_SUFFIX) 1000 > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)fibonacci$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test that we can asynchronously stop the target in PinDB by sending CTRL-C (SIGINT).
+# TODO: This is disabled until Mantis #2055 is fixed.
+#
+pindb-async-stop.test: $(OBJDIR)sleep-unix$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)sleep-unix$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout) & \
+	    pid=$$!; \
+	    sleep 2; \
+	    while kill -INT $$pid > /dev/null 2>&1; \
+	    do \
+	        sleep 2; \
+	    done; \
+	    wait
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test of breakpoint commands in the "debugger-shell" instrumentation library.
+#
+debugger-shell-breakpoints.test: $(OBJDIR)debugger-shell-app-$(TARGET)$(EXE_SUFFIX) $(OBJDIR)use-debugger-shell$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(OBJDIR)debugger-shell-app-$(TARGET)$(EXE_SUFFIX) breakpoints $(OBJDIR)$(@:.test=.$(DBG_STR)in.0) $(OBJDIR)$(@:.test=.compare)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)use-debugger-shell$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)debugger-shell-app-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(OBJDIR)$(@:.test=.$(DBG_STR)in.0) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)debugger-shell-app-$(TARGET)$(EXE_SUFFIX) \
+	  > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(OBJDIR)$(@:.test=.compare) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in.0) $(OBJDIR)$(@:.test=.compare) \
+	      $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test of tracepoint commands in the "debugger-shell" instrumentation library.
+#
+debugger-shell-tracepoints.test: $(OBJDIR)debugger-shell-app-$(TARGET)$(EXE_SUFFIX) $(OBJDIR)use-debugger-shell$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(OBJDIR)debugger-shell-app-$(TARGET)$(EXE_SUFFIX) tracepoints $(OBJDIR)$(@:.test=.$(DBG_STR)in.0) $(OBJDIR)$(@:.test=.compare)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)use-debugger-shell$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)debugger-shell-app-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(OBJDIR)$(@:.test=.$(DBG_STR)in.0) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)debugger-shell-app-$(TARGET)$(EXE_SUFFIX) \
+	  > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(OBJDIR)$(@:.test=.compare) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in.0) $(OBJDIR)$(@:.test=.compare) \
+	      $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test that the thread-start, thread-fini, and fini call-backs are correctly called even when GDB
+# immediately terminates the application .
+#
+start-fini.test: $(OBJDIR)start-fini-callback$(PINTOOL_SUFFIX) $(OBJDIR)simple$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)start-fini-callback$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:.test=.toolout) \
+	  -- $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) & \
+	    count=0; \
+	    until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	        do sleep 1; count=`expr $$count + 1`; done; \
+	    echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in); \
+	    $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in); \
+	    cat quit.$(DBG_STR) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in); \
+	    $(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1; \
+	wait
+	$(CMP) start-fini.reference $(OBJDIR)$(@:.test=.toolout)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.toolout) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test that the thread-start, thread-fini, and fini call-backs are correctly called when PinDB
+# immediately terminates the application (tested on both Linux and Windows).
+#
+pindb-start-fini.test: $(OBJDIR)start-fini-callback$(PINTOOL_SUFFIX) $(OBJDIR)simple$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)start-fini-callback$(PINTOOL_SUFFIX) \
+	    -o $(OBJDIR)$(@:.test=.toolout)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)simple$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(DIFF) start-fini.reference $(OBJDIR)$(@:.test=.toolout)
+	$(SYNC)
+	$(RM) -f $(OBJDIR)$(@:.test=.toolout) $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+stop-resume-when-suspended.test: $(OBJDIR)stop-resume-when-suspended$(PINTOOL_SUFFIX) $(OBJDIR)simple$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.toolout) $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)stop-resume-when-suspended$(PINTOOL_SUFFIX) \
+	    -o $(OBJDIR)$(@:.test=.toolout)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)simple$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	sleep 5
+	$(DIFF) stop-resume-when-suspended.reference $(OBJDIR)$(@:.test=.toolout)
+	$(QGREP) "Sum is 55" $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.toolout) $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Verify that PIN_InterceptDebuggingEvent() can intercept and squash breakpoints.
+#
+intercept-breakpoint.test: $(OBJDIR)intercept-app$(EXE_SUFFIX) $(OBJDIR)intercept-tool$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)intercept-tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)intercept-app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)intercept-app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=-gdb.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=-app.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test the PIN_AddDebuggerRegisterEmulator() API.  This test is legal to run with any version of GDB,
+# but it only tests the API well when run with a GDB that supports register extensions in the XML
+# "feature document".  This includes GDB 7.2 and later, and a few special earlier distributions.
+#
+emu-simple.test: $(OBJDIR)simple$(EXE_SUFFIX) $(OBJDIR)null-emulator-$(TARGET)$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)null-emulator-$(TARGET)$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat simple.$(DBG_STR) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p simple.compare -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Verify that the debugger can print the value of a YMM register when running on native AVX hardware.
+# This test will pass even when run on non-AVX hardware.  However, it's only effective when run on
+# AVX hardware and when run with a GDB that supports AVX.
+#
+ymm.test: $(OBJDIR)ymm-$(TARGET)$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -- $(OBJDIR)ymm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)ymm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+ymm_with_set_xmm_scratch_regs_tool.test: $(OBJDIR)set_xmm_scratches_for_ymmtest$(PINTOOL_SUFFIX) $(OBJDIR)ymm-$(TARGET)$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)set_xmm_scratches_for_ymmtest$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)ymm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || test $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)ymm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	sleep 5
+	cat set_xmm_scratches_for_ymmtest.out
+	$(QGREP) instrumented set_xmm_scratches_for_ymmtest.out
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f instrumented set_xmm_scratches_for_ymmtest.out
+
+# Verify that the debugger can print the value of a ZMM register when running on native AVX512 hardware.
+# This test will pass even when run on non-AVX512 hardware.  However, it's only effective when run on
+# AVX512 hardware and when run with a GDB that supports AVX512.
+#
+zmm.test: $(OBJDIR)zmm-$(TARGET)$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -- $(OBJDIR)zmm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	-$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)zmm-$(TARGET)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	if ! $(QGREP) "HandleSigill" $(OBJDIR)$(@:.test=.$(DBG_STR)out) ; then \
+	  $(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out); \
+	fi
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+pindb-zmm.test: $(OBJDIR)zmm-$(TARGET)$(EXE_SUFFIX)
+	echo "set pinargs " > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)zmm-$(TARGET)$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	if ! $(QGREP) "Processor does not support AVX512" $(OBJDIR)$(@:.test=.pindbout) ; then \
+	  $(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout); \
+	fi
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Verify that the debugger change the the PC when stopped after an indirect JMP instruction.
+#
+pc-change-bp.test: $(OBJDIR)pc-change-bp$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -- $(OBJDIR)pc-change-bp$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)pc-change-bp$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Verify that the tool can change the PC from an ASYNC_BREAK intercept function when the thread
+# is stopped after an indirect JMP instruction.
+#
+pc-change-async.test: $(OBJDIR)pc-change-async$(EXE_SUFFIX) $(OBJDIR)pc-change-async-tool$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)pc-change-async-tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)pc-change-async$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)pc-change-async$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test the PIN_RemoveDebugInterpreter() API.
+#
+interpreter-remove.test: $(OBJDIR)interpreter-remove$(PINTOOL_SUFFIX) $(OBJDIR)simple$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) -appdebug -t $(OBJDIR)interpreter-remove$(PINTOOL_SUFFIX) -- $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	  do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	echo 'monitor bdio' >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	echo 'c' >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)simple$(EXE_SUFFIX) > /dev/null 2>&1
+	! $(GREP) 'PIN_RemoveDebugInterpreter failed' $(OBJDIR)$(@:.test=.out) > /dev/null
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+
+# Verify that GDB can terminate an application where one thread is blocked in
+# a system call.  Previously, the Pin process would sometimes hang when this
+# happened, so the test checks that the process exits.  (Note, "kill -s 0 <pid>"
+# just checks if a process exists, it doesn't send a signal.)
+#
+mt-exit.test: $(OBJDIR)mt-exit$(EXE_SUFFIX) $(OBJDIR)mt-exit-tool$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.toolout)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)mt-exit-tool$(PINTOOL_SUFFIX) -o $(OBJDIR)$(@:.test=.toolout) \
+	  -- $(OBJDIR)mt-exit$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)mt-exit$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	pid=`cat $(OBJDIR)$(@:.test=.toolout)`; \
+	count=0; \
+	until ! kill -s 0 $$pid > /dev/null 2>&1 || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done; \
+	$(BASHTEST) $$count -le $(TLIMIT)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out) $(OBJDIR)$(@:.test=.toolout)
+
+# Simple test of the PIN_GetDebuggerType() API.
+#
+debugger-type.test: $(OBJDIR)simple$(EXE_SUFFIX) $(OBJDIR)debugger-type$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)debugger-type$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(GREP) -i 'Debugger Type is $(DBG_STR)' $(OBJDIR)$(@:.test=.out) > /dev/null
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test that we can single-step into a signal handler.
+#
+signal-step.test: $(OBJDIR)signal-catch$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -- $(OBJDIR)signal-catch$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)signal-catch$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test that GDB can print $_siginfo and get the signal information structure from Pin.
+#
+siginfo.test: $(OBJDIR)signal-catch$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -- $(OBJDIR)signal-catch$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)signal-catch$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test that PinDB can attach after the Pin tool has stopped at a custom breakpoint and that PinDB
+# can still get the tool's custom stop message (see Mantis #2357).
+#
+# This is disabled on Windows, but it could probably be enabled there when Mantis #1839 is fixed.
+#
+pindb-attach-after-custom-stop.test: $(OBJDIR)simple$(EXE_SUFFIX) $(OBJDIR)breaktool$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG_RUNFREE) \
+	  -t $(OBJDIR)breaktool$(PINTOOL_SUFFIX) -where main -wait_for_debugger 1 -port $(OBJDIR)$(@:.test=.port) \
+	    -- $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) 'Tool stopping at breakpoint' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    --gdb-protocol=:`cat $(OBJDIR)$(@:.test=.port)` $(PINDB_USERFLAGS) < $(@:.test=.pindbin) > \
+	    $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.port) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test Windows unhandled exception with PinDB.
+#
+pindb-win-unhandled-exception.test: $(OBJDIR)win-unhandled-exception$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)win-unhandled-exception$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test Windows handled exception with PinDB.
+#
+pindb-win-handled-exception.test: $(OBJDIR)win-handled-exception$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)win-handled-exception$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test Windows continued exception with PinDB.  The exception filter continues the search.
+pindb-win-continued-exception1.test: $(OBJDIR)win-continued-exception1$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)win-continued-exception1$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test Windows continued exception with PinDB.  The exception filter executes the handler.
+pindb-win-continued-exception2.test: $(OBJDIR)win-continued-exception2$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)win-continued-exception2$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test Windows software exception with PinDB.  The exception is raised via RaiseException() and is unhandled.
+#
+pindb-win-software-exception.test: $(OBJDIR)win-software-exception$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)win-software-exception$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test Windows C++ exception with PinDB.
+#
+pindb-win-cpp-exception.test: $(OBJDIR)win-cpp-exception$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)win-cpp-exception$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test ability to squash a Windows exception.  Squashing a first-chance exception re-executes
+# the excepting instruction, which raises a new first-chance exception.  Squashing a last-chance
+# exception also re-executes the excepting instruction, which raises a new first-chance exception.
+#
+pindb-win-squash-exception.test: $(OBJDIR)win-unhandled-exception$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)win-unhandled-exception$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test ability to single-step after receiving a Windows exception.  Stepping from a first-chance
+# exception should go to the first instruction in the handler.  Stepping from a last-chance
+# exception should cause the application to terminate.
+#
+pindb-win-step-exception.test: $(OBJDIR)win-unhandled-exception$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)win-unhandled-exception$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test that Pin properly handles exception which happens after beginning of process exit flow
+# when PinADX is disabled.
+#
+pindb-win-exception-after-exit.test: $(OBJDIR)win-exception-after-exit$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)win-exception-after-exit$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) \
+	    --noprompt $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	sleep 2
+	$(QGREP) "Caught exception C0000005" $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test DLL load / unload notifications with PinDB.
+#
+pindb-win-library-notifications.test: $(OBJDIR)win-load-library$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)win-foo-library$(DLL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)win-load-library$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)win-foo-library$(DLL_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test ability to single-step after receiving a Windows library load / unload notification.
+#
+pindb-win-step-library.test: $(OBJDIR)win-load-library$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)win-foo-library$(DLL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)win-load-library$(EXE_SUFFIX) $(OBJDIR)$(DLL_PREFIX)win-foo-library$(DLL_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Make sure PinDB does not wait for confirmation when killing the target process when --noprompt is specified.
+#
+pindb-noprompt-kill.test: $(OBJDIR)simple$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)simple$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test the -appdebug_allow_remote knob, which allows GDB to run on a different machine than Pin.
+# However, it's difficult to actually run GDB on a different machine as part of this test, so
+# we still run them both on the same machine.
+#
+allow-remote.test: $(OBJDIR)simple$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -appdebug_allow_remote -- $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat simple.$(DBG_STR) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p simple.compare -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Verify that Pin doesn't crash if the debugger attempts to access a 64-bit address for a 32-bit Pin process.
+#
+access-64-on-32.test: $(OBJDIR)simple$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)simple$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Make sure we can ebable debugging via PIN_SetDebugMode() from the tool.  This test should
+# be run without -appdebug.
+#
+set-mode.test: $(OBJDIR)simple$(EXE_SUFFIX) $(OBJDIR)set-mode-tool$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) -t $(OBJDIR)set-mode-tool$(PINTOOL_SUFFIX) -- $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat simple.$(DBG_STR) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(PYCOMPARE) -p simple.compare -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test that PinDB can detach from Pin.
+#
+pindb-detach.test: $(OBJDIR)simple-pindb$(EXE_SUFFIX) $(DEFAULT_TOOL)
+	$(OBJDIR)simple-pindb$(EXE_SUFFIX) detach $(OBJDIR)$(@:.test=.pindbin.0) $(OBJDIR)$(@:.test=.compare)
+	echo "set pinargs $(PIN_USERFLAGS) $(PIN_CMD_DEFAULT_TOOL)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)simple-pindb$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(OBJDIR)$(@:.test=.pindbin.0) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(OBJDIR)$(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout) $(OBJDIR)$(@:.test=.pindbin.0) \
+	      $(OBJDIR)$(@:.test=.compare)
+
+# Abruptly disconnect PinDB from Pin.  This simulates the behavior when the debugger unexpectedly dies.
+# We expect an error from Pin, but Pin shouldn't hang.
+#
+pindb-abrupt-disconnect.test: $(OBJDIR)simple$(EXE_SUFFIX)
+	echo "set pinargs -logfile $(OBJDIR)$(@:.test=.pin.log) $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)simple$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(SYNC)
+	$(RM) -f $(OBJDIR)$(@:.test=.pin.log) $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbin) \
+	      $(OBJDIR)$(@:.test=.pindbout)
+
+# Test the "kill-like-gdb" command in PinDB.  This sends the same legacy "kill" command to PinADX that
+# GDB uses.
+#
+pindb-kill-like-gdb.test: $(OBJDIR)simple$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)simple$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test that GDB can detach from Pin and then re-attach later.
+#
+gdb-detach-reattach.test: $(OBJDIR)reattach-loop$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -- $(OBJDIR)reattach-loop$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > $(OBJDIR)$(@:.test=.port)
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=-1.$(DBG_STR)in)
+	cat $(OBJDIR)$(@:.test=.port) >> $(OBJDIR)$(@:.test=-1.$(DBG_STR)in)
+	cat $(@:.test=-1.$(DBG_STR)) >> $(OBJDIR)$(@:.test=-1.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=-1.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)reattach-loop$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=-1.$(DBG_STR)out)
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=-2.$(DBG_STR)in)
+	cat $(OBJDIR)$(@:.test=.port) >> $(OBJDIR)$(@:.test=-2.$(DBG_STR)in)
+	cat $(@:.test=-2.$(DBG_STR)) >> $(OBJDIR)$(@:.test=-2.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=-2.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)reattach-loop$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=-2.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=-gdb-1.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=-1.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=-gdb-2.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=-2.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=-app.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.port) $(OBJDIR)$(@:.test=-1.$(DBG_STR)in) \
+	      $(OBJDIR)$(@:.test=-1.$(DBG_STR)out) $(OBJDIR)$(@:.test=-2.$(DBG_STR)in) $(OBJDIR)$(@:.test=-2.$(DBG_STR)out)
+
+# Test that GDB can detach from Pin and then re-attach later.
+#
+gdb-detach-reattach-fixed-port.test: $(OBJDIR)reattach-loop$(EXE_SUFFIX) $(OBJDIR)pick-random-port$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(OBJDIR)pick-random-port$(EXE_SUFFIX) unused > $(OBJDIR)$(@:.test=.random)
+	$(PIN) $(PINFLAGS_DEBUG) -appdebug_server_port `cat $(OBJDIR)$(@:.test=.random)` -- \
+	    $(OBJDIR)reattach-loop$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) 'target remote :'`cat $(OBJDIR)$(@:.test=.random)` \
+	    $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	$(GREP) 'target remote :'`cat $(OBJDIR)$(@:.test=.random)` $(OBJDIR)$(@:.test=.out) > $(OBJDIR)$(@:.test=.port)
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=-1.$(DBG_STR)in)
+	cat $(OBJDIR)$(@:.test=.port) >> $(OBJDIR)$(@:.test=-1.$(DBG_STR)in)
+	cat $(@:.test=-1.$(DBG_STR)) >> $(OBJDIR)$(@:.test=-1.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=-1.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)reattach-loop$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=-1.$(DBG_STR)out)
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=-2.$(DBG_STR)in)
+	cat $(OBJDIR)$(@:.test=.port) >> $(OBJDIR)$(@:.test=-2.$(DBG_STR)in)
+	cat $(@:.test=-2.$(DBG_STR)) >> $(OBJDIR)$(@:.test=-2.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=-2.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)reattach-loop$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=-2.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=-gdb-1.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=-1.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=-gdb-2.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=-2.$(DBG_STR)out)
+	$(PYCOMPARE) -p $(@:.test=-app.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.port) $(OBJDIR)$(@:.test=-1.$(DBG_STR)in) \
+	    $(OBJDIR)$(@:.test=-1.$(DBG_STR)out) $(OBJDIR)$(@:.test=-2.$(DBG_STR)in) $(OBJDIR)$(@:.test=-2.$(DBG_STR)out) \
+	    $(OBJDIR)$(@:.test=.random)
+
+# Test that extended commands work using PinDB.  This also checks that the tool does _not_ receive
+# commands that start with the "pin " prefix.
+#
+pindb-simple-command.test: $(OBJDIR)simple$(EXE_SUFFIX) $(OBJDIR)simple-command-tool$(PINTOOL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)simple-command-tool$(PINTOOL_SUFFIX)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)simple$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test that the debugger can write to an invalid address in the application.
+#
+invalid-write.test: $(OBJDIR)simple$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -- $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	-$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)simple$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Try debugging an application with lots of threads that exit at the same time.
+#
+pindb-win-thread-stress.test: $(OBJDIR)win-thread-stress$(EXE_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)win-thread-stress$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test that we can single-step over an instruction that exits the calling thread while another thread
+# still exists.  We expect the debugger to stop after the thread exits, leaving the focus on
+# the one remaining thread.
+#
+pindb-pthread-step-exit.test: $(OBJDIR)pthread-bare-exit$(EXE_SUFFIX) $(DEFAULT_TOOL)
+	echo "set pinargs $(PIN_USERFLAGS) $(PIN_CMD_DEFAULT_TOOL)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)pthread-bare-exit$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Same test as above, but use GDB instead of PinDB.
+#
+gdb-pthread-step-exit.test: $(OBJDIR)pthread-bare-exit$(EXE_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -- $(OBJDIR)pthread-bare-exit$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)pthread-bare-exit$(EXE_SUFFIX) \
+	  > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test that we can debug an application where one thread exits the entire process
+# while another thread still exists.
+#
+pindb-pthread-cont-exitgroup.test: $(OBJDIR)pthread-bare-exitgroup$(EXE_SUFFIX) $(DEFAULT_TOOL)
+	echo "set pinargs $(PIN_USERFLAGS) $(PIN_CMD_DEFAULT_TOOL)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)pthread-bare-exitgroup$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test that we can single-step over an instruction that exits the entire process while
+# another thread still exists.  We expect the debugger to stop after the exit call
+# and indicate that the process is terminated.
+#
+pindb-pthread-step-exitgroup.test: $(OBJDIR)pthread-bare-exitgroup$(EXE_SUFFIX) $(DEFAULT_TOOL)
+	echo "set pinargs $(PIN_USERFLAGS) $(PIN_CMD_DEFAULT_TOOL)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)pthread-bare-exitgroup$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Test that we can single-step over an instruction that triggers a custom breakpoint.
+# This should stop due to the custom breakpoint, without stepping over the instruction.
+# A subsequent step should skip the custom breakpoint and step over the instruction.
+#
+pindb-step-custom-break.test: $(OBJDIR)simple-pindb$(EXE_SUFFIX) $(OBJDIR)use-debugger-shell$(PINTOOL_SUFFIX)
+	$(OBJDIR)simple-pindb$(EXE_SUFFIX) step-custom-break $(OBJDIR)$(@:.test=.pindbin.0) $(OBJDIR)$(@:.test=.compare)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)use-debugger-shell$(PINTOOL_SUFFIX)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)simple-pindb$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(OBJDIR)$(@:.test=.pindbin.0) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(OBJDIR)$(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin.0) $(OBJDIR)$(@:.test=.compare) $(OBJDIR)$(@:.test=.pindbin) \
+	      $(OBJDIR)$(@:.test=.pindbout)
+
+# Test the behavior when several threads stop at simultaneous tool breakpoints.
+# After one breakpoint is delivered, the others are pending.  This test makes
+# sure that the pending events are delivered one-at-a-time to GDB.  It also
+# tests that the tool can list the pending breakpoints.
+#
+simultaneous-toolbreak.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX) -sync_for_threads 4 \
+	  -- $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 4 > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+simultaneous-toolbreak_const_context.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX) -sync_for_threads 4 -const_context 1 \
+	  -- $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 4 > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || test $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Another test when several threads stop at simultaneous tool breakpoints.
+# After one breakpoint is delivered, the others are pending.  This test
+# squashes the pending breakpoints and then makes sure they are not
+# delivered to GDB.
+#
+simultaneous-toolbreak-squash.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX) -sync_for_threads 4 \
+	  -- $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 4 > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Another test when several threads stop at simultaneous tool breakpoints.
+# After one breakpoint is delivered, the others are pending.  This test
+# changes the message of the pending breakpoints and then makes sure they
+# are delivered with the new message.
+#
+simultaneous-toolbreak-change.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX) -sync_for_threads 4 \
+	  -- $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 4 > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Test that we can attach GDB to the application after it has stopped
+# at several simultaneous tool breakpoints.  We expect GDB to attach
+# at the context of one of those breakpoints, and we expect the others
+# to be pending.
+#
+simultaneous-toolbreak-attach.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG_RUNFREE) \
+	  -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX) -sync_for_threads 4 -wait_for_debugger \
+	    -- $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 4 > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) 'Waiting for debugger to attach' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+# Another test when several threads stop at simultaneous tool breakpoints.
+# This test runs with PinDB, which expects all breakpoints to be delivered
+# simultaneously.  Make sure that all 4 breakpoints are delivered at once,
+# and that none are pending.
+#
+pindb-simultaneous-toolbreak.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX) -sync_for_threads 4" \
+	  > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 4" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Another test when several threads stop at simultaneous tool breakpoints.
+# This test runs PinDB in a mode where each breakpoint is delivered one-
+# at-a-time (similar to GDB).  We make sure that there are pending breakpoints
+# after the first is delivered, and we make sure that all breakpoints are
+# delivered one-at-a-time.
+#
+pindb-simultaneous-toolbreak-serialize.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX) -sync_for_threads 4" \
+	  > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 4" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) \
+	    --serialize-debugger-events --noprompt $(PINDB_USERFLAGS) \
+	    < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Another test when several threads stop at simultaneous tool breakpoints.
+# This test also runs PinDB in a mode where each breakpoint is delivered
+# one-at-a-time.  In this test, we squash the remaining breakpoints after
+# the first is delivered and then make sure that the squashed breakpoints
+# are not delivered.
+#
+pindb-simultaneous-toolbreak-squash.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX) -sync_for_threads 4" \
+	  > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 4" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) \
+	    --serialize-debugger-events --noprompt $(PINDB_USERFLAGS) \
+	    < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Another test when several threads stop at simultaneous tool breakpoints.
+# This test also runs PinDB in a mode where each breakpoint is delivered
+# one-at-a-time.  In this test, we change the message of the remaining
+# breakpoints after the first is delivered and then make sure that the
+# breakpoints are delivered with the changed message.
+#
+pindb-simultaneous-toolbreak-change.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX) -sync_for_threads 4" \
+	  > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 4" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) \
+	    --serialize-debugger-events --noprompt $(PINDB_USERFLAGS) \
+	    < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# Another test when several threads stop at simultaneous tool breakpoints.
+# When breakpoints are delivered one-at-a-time, try single-stepping one
+# thread while there are pending breakpoints on the others.  The pending
+# breakpoints should not be delivered because the single-step doesn't
+# advance the execution of those threads.
+#
+pindb-simultaneous-toolbreak-step.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX) -sync_for_threads 4" \
+	  > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 4" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) \
+	    --serialize-debugger-events --noprompt $(PINDB_USERFLAGS) \
+	    < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# This is a stress test for simultaneous debugger events.  Each thread stops when
+# the thread is created, at a normal breakpoint, at a tool breakpoint, and stops
+# when the thread exits.  There is no serialization in this variant of the test,
+# so we expect that many events will be reported to the debugger simultaneously.
+# The test verifies that we get all the events.
+#
+pindb-simultaneous-multi.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 8" >> $(OBJDIR)$(@:.test=.pindbin)
+	$(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -print-address > $(OBJDIR)$(@:.test=.address)
+	sed "s/GLOBAL_FUNCTION/`cat $(OBJDIR)$(@:.test=.address)`/" $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+        $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare1) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare2) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare3) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare4) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout) $(OBJDIR)$(@:.test=.address)
+
+# This test is identical to the one above except that we don't stop when new
+# threads are created or when they exit.  We use this test on Windows to avoid
+# a problem with the virus scanner.  If a virus scan happens when this test runs,
+# the scanner injects a new thread into the test application.  If the debugger
+# stops when new threads are created, the scanner thread causes an extra stop in
+# the debugger which causes the test to fail.  This variant of the test avoids
+# the problem by not stopping in the debugger when new threads start or exit.
+# We also run this test on Unix because it tests different code paths in Pin.
+#
+pindb-simple-simultaneous-multi.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 8" >> $(OBJDIR)$(@:.test=.pindbin)
+	$(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -print-address > $(OBJDIR)$(@:.test=.address)
+	sed "s/GLOBAL_FUNCTION/`cat $(OBJDIR)$(@:.test=.address)`/" $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+        $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare1) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare2) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout) $(OBJDIR)$(@:.test=.address)
+
+# This is another stress test for simultaneous debugger events, similar to the
+# one above.  In this variant, Pin delivers the events one-at-a-time to the
+# debugger.  Again, we verifiy that the debugger gets them all.
+#
+pindb-simultaneous-multi-serialize.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 8" >> $(OBJDIR)$(@:.test=.pindbin)
+	$(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -print-address > $(OBJDIR)$(@:.test=.address)
+	sed "s/GLOBAL_FUNCTION/`cat $(OBJDIR)$(@:.test=.address)`/" $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) \
+	    --serialize-debugger-events --noprompt $(PINDB_USERFLAGS) \
+	    < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare1) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare2) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare3) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare4) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout) $(OBJDIR)$(@:.test=.address)
+
+# This test is identical to the one above except that we don't stop when new
+# threads are created or when they exit.  We use this test on Windows to avoid
+# a problem with the virus scanner.  See "pindb-simple-simultaneous-multi.test"
+# for more information.  We also run it on Unix because it tests different code
+# paths in Pin.
+#
+pindb-simple-simultaneous-multi-serialize.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 8" >> $(OBJDIR)$(@:.test=.pindbin)
+	$(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -print-address > $(OBJDIR)$(@:.test=.address)
+	sed "s/GLOBAL_FUNCTION/`cat $(OBJDIR)$(@:.test=.address)`/" $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) \
+	    --serialize-debugger-events --noprompt $(PINDB_USERFLAGS) \
+	    < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare1) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare2) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout) $(OBJDIR)$(@:.test=.address)
+
+# This is similar to "simultaneous-toolbreak-attach", but we use PinDB
+# instead of GDB.  The application stops at several simultaneous breakpoints
+# before PinDB attaches.  Since PinDB allows multiple simultaneous breakpoints,
+# we expect all of them to be visible when PinDB attaches, and there will be
+# no pending breakpoints.
+#
+# This is disabled on Windows, but it could probably be enabled there when Mantis #1839 is fixed.
+#
+pindb-simultaneous-toolbreak-attach.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX)
+	$(RM) -f $(OBJDIR)$(@:.test=.out)
+	$(PIN) $(PINFLAGS_DEBUG_RUNFREE) -t $(OBJDIR)simultaneous-toolbreak$(PINTOOL_SUFFIX) -sync_for_threads 4 \
+	  -wait_for_debugger -port $(OBJDIR)$(@:.test=.port) -- $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 4 \
+	    > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) 'Waiting for debugger to attach' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    --gdb-protocol=:`cat $(OBJDIR)$(@:.test=.port)` $(PINDB_USERFLAGS) < $(@:.test=.pindbin) > \
+	    $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout) $(OBJDIR)$(@:.test=.address) \
+	  $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.port)
+
+# Test that we can use a custom command to change the register state of the target application,
+# and then use the "invalidate registers" API to invalidate any stale register data in the
+# debugger protocol library.
+#
+pindb-invalidate-regs.test: $(OBJDIR)simple$(EXE_SUFFIX) $(OBJDIR)invalidate-regs$(PINTOOL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)invalidate-regs$(PINTOOL_SUFFIX)" > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)simple$(EXE_SUFFIX)" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) \
+	    --noprompt $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout)
+
+# This test validates stopping threads API called in application thread.
+app-pause-in-app-thread.test: $(OBJDIR)app-pause-in-app-thread-tool$(PINTOOL_SUFFIX) $(OBJDIR)app-pause-app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)app-pause-in-app-thread-tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)app-pause-app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out)
+	$(CGREP) 'Threads stopped by application thread' $(OBJDIR)$(@:.test=.out) | $(QGREP) "3"
+	$(RM) $(OBJDIR)$(@:.test=.out)
+
+# This test validates stopping threads API called in internal thread.
+app-pause-in-int-thread.test: $(OBJDIR)app-pause-in-int-thread-tool$(PINTOOL_SUFFIX) $(OBJDIR)app-pause-app$(EXE_SUFFIX)
+	$(PIN) -t $(OBJDIR)app-pause-in-int-thread-tool$(PINTOOL_SUFFIX) \
+	  -- $(OBJDIR)app-pause-app$(EXE_SUFFIX) > $(OBJDIR)$(@:.test=.out)
+	$(CGREP) 'Threads stopped by internal thread' $(OBJDIR)$(@:.test=.out) | $(QGREP) "3"
+	$(RM) $(OBJDIR)$(@:.test=.out)
+
+check-if-thread-stopped.test: $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) $(OBJDIR)check-if-thread-stopped$(PINTOOL_SUFFIX)
+	echo "set pinargs $(PIN_USERFLAGS) -t $(OBJDIR)check-if-thread-stopped$(PINTOOL_SUFFIX) -threads 4" \
+	  -o $(OBJDIR)$(@:.test=.toolout) > $(OBJDIR)$(@:.test=.pindbin)
+	echo "run $(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX) -threads 4" >> $(OBJDIR)$(@:.test=.pindbin)
+	cat $(@:.test=.pindb) >> $(OBJDIR)$(@:.test=.pindbin)
+	$(PINDB_WITH_LIBPATH) --pin=$(BARE_PIN) --timeout=$(TLIMIT) --cpu=$(TARGET) --noprompt \
+	    $(PINDB_USERFLAGS) < $(OBJDIR)$(@:.test=.pindbin) > $(OBJDIR)$(@:.test=.pindbout)
+	sleep 5
+	$(PYCOMPARE) -p $(@:.test=.compare) -c $(OBJDIR)$(@:.test=.pindbout)
+	$(QGREP) "Finished" $(OBJDIR)$(@:.test=.toolout)
+	$(RM) -f $(OBJDIR)$(@:.test=.pindbin) $(OBJDIR)$(@:.test=.pindbout) $(OBJDIR)$(@:.test=.toolout)
+
+# Tests GDB extension of retrieving loaded shared libraries
+# Also, this test changes the base address of libc.so as seen
+# by GDB to 0xd00dead and checks that GDB reports the expected
+# base address.
+#
+gdb-svr4-libraries-extension.test: $(OBJDIR)dlopen-dlclose$(EXE_SUFFIX) $(OBJDIR)library-load-tool$(PINTOOL_SUFFIX)
+	$(PIN) $(PINFLAGS_DEBUG) -t $(OBJDIR)library-load-tool$(PINTOOL_SUFFIX) -- \
+	    $(OBJDIR)dlopen-dlclose$(EXE_SUFFIX) `$(CXX) $(COMP_OBJ) /dev/null -print-file-name=libm.so` > $(OBJDIR)$(@:.test=.out) &
+	count=0; \
+	until $(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) > /dev/null || $(BASHTEST) $$count -gt $(TLIMIT); \
+	    do sleep 1; count=`expr $$count + 1`; done
+	echo '$(BATCH_CMD_TIMEOUT_LIMIT)' > $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(GREP) '$(BATCH_CMD_CONNECT_REMOTE)' $(OBJDIR)$(@:.test=.out) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	cat $(@:.test=.$(DBG_STR)) >> $(OBJDIR)$(@:.test=.$(DBG_STR)in)
+	$(DBG) $(DBG_CMD_SRC_FLAG) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(DBG_CMD_MORE_FLAGS) $(OBJDIR)dlopen-dlclose$(EXE_SUFFIX) \
+	  > $(OBJDIR)$(@:.test=.$(DBG_STR)out) 2>&1
+	$(PYCOMPARE) -p $(@:.test=.compare$(COMPARE_RE_FILE_SUFFIX)) -c $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+	$(RM) -f $(OBJDIR)$(@:.test=.out) $(OBJDIR)$(@:.test=.$(DBG_STR)in) $(OBJDIR)$(@:.test=.$(DBG_STR)out)
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special tools' build rules ######
+
+$(OBJDIR)use-debugger-shell$(PINTOOL_SUFFIX): $(OBJDIR)use-debugger-shell$(OBJ_SUFFIX) $(OBJDIR)debugger-shell$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)set_xmm_scratches_before_breakpoint$(PINTOOL_SUFFIX): $(OBJDIR)set_xmm_scratches_before_breakpoint$(OBJ_SUFFIX) $(OBJDIR)set_xmm_scratches_asm$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)set_xmm_scratches_before_breakpoint_and_set_xmm_reg$(PINTOOL_SUFFIX): $(OBJDIR)set_xmm_scratches_before_breakpoint_and_set_xmm_reg$(OBJ_SUFFIX) $(OBJDIR)set_xmm_scratches_asm$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)set_xmm_scratches$(PINTOOL_SUFFIX): $(OBJDIR)set_xmm_scratches$(OBJ_SUFFIX) $(OBJDIR)set_xmm_scratches_asm$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+$(OBJDIR)set_xmm_scratches_for_ymmtest$(PINTOOL_SUFFIX): $(OBJDIR)set_xmm_scratches_for_ymmtest$(OBJ_SUFFIX) $(OBJDIR)set_xmm_scratches_asm$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS)
+
+###### Special applications' build rules ######
+
+$(OBJDIR)check-ftag$(EXE_SUFFIX): check-ftag.c $(OBJDIR)check-ftag_asm$(OBJ_SUFFIX)
+	$(APP_CC) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LIBS)
+
+$(OBJDIR)simple$(EXE_SUFFIX): simple.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)bphandler_app$(EXE_SUFFIX): bphandler_app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)simple-static$(EXE_SUFFIX): simple.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(STATIC) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)exec$(EXE_SUFFIX): exec.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)fork$(EXE_SUFFIX): fork.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)bptest-$(TARGET)$(EXE_SUFFIX): bptest.cpp bptest-asm-$(TARGET).s
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)action-pending-app$(EXE_SUFFIX): action-pending-app.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)xmm-$(TARGET)$(EXE_SUFFIX): xmm.c xmm-asm-$(TARGET).s
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)thread$(EXE_SUFFIX): thread.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)thread-static$(EXE_SUFFIX): thread.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(STATIC) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)simple-pindb$(EXE_SUFFIX): simple-pindb.cpp $(OBJDIR)simple-pindb-asm-$(TARGET)$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(NO_RANDOM) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)checkpoint-app$(EXE_SUFFIX): checkpoint-app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)watchpoint-app$(EXE_SUFFIX): watchpoint-app.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)callerapp$(EXE_SUFFIX): callerapp.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)fibonacci$(EXE_SUFFIX): $(TOOLS_ROOT)/ManualExamples/fibonacci.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)sleep-unix$(EXE_SUFFIX): sleep-unix.c
+	$(APP_CC) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)debugger-shell-app-$(TARGET)$(EXE_SUFFIX): debugger-shell-app.cpp debugger-shell-app-$(TARGET).s
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)intercept-app$(EXE_SUFFIX): intercept-app.cpp intercept-app-asm-$(TARGET).s
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)ymm-$(TARGET)$(EXE_SUFFIX): ymm.cpp ymm-asm-$(TARGET).s
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)zmm-$(TARGET)$(EXE_SUFFIX): zmm.cpp $(OBJDIR)zmm-asm-$(TARGET)$(OBJ_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)pc-change-bp$(EXE_SUFFIX): pc-change-bp.cpp pc-change-bp-asm-$(TARGET).s
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)pc-change-async$(EXE_SUFFIX): pc-change-async.cpp pc-change-async-asm-$(TARGET).s
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)mt-exit$(EXE_SUFFIX): mt-exit.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)signal-catch$(EXE_SUFFIX): signal-catch.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)win-unhandled-exception$(EXE_SUFFIX): win-unhandled-exception.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+ 
+$(OBJDIR)win-handled-exception$(EXE_SUFFIX): win-handled-exception.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)win-continued-exception1$(EXE_SUFFIX): win-continued-exception1.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)win-continued-exception2$(EXE_SUFFIX): win-continued-exception2.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)win-software-exception$(EXE_SUFFIX): win-software-exception.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)win-cpp-exception$(EXE_SUFFIX): win-cpp-exception.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)win-exception-after-exit$(EXE_SUFFIX): win-exception-after-exit.cpp $(OBJDIR)$(DLL_PREFIX)win-exception-after-exit-dll$(DLL_SUFFIX)
+	$(APP_CXX) $(APP_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(APP_LIBS) $(OBJDIR)win-exception-after-exit-dll$(LIB_SUFFIX)
+
+$(OBJDIR)win-load-library$(EXE_SUFFIX): win-load-library.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)reattach-loop$(EXE_SUFFIX): reattach-loop.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(NO_PIC) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)win-thread-stress$(EXE_SUFFIX): win-thread-stress.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)pthread-bare-exit$(EXE_SUFFIX): pthread-bare-exit.cpp pthread-bare-exit-asm-$(TARGET).s
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)pthread-bare-exitgroup$(EXE_SUFFIX): pthread-bare-exitgroup.cpp pthread-bare-exitgroup-asm-$(TARGET).s
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+# A simple threaded application that we use for several tests.  Both Windows and Posix (Unix)
+# versions export the function "GlobalFunction()", which the tests rely on.
+#
+$(OBJDIR)thread-$(OS_TYPE)$(EXE_SUFFIX): thread-$(OS_TYPE).cpp
+	$(APP_CXX) $(COMPONENT_INCLUDES) $(APP_CXXFLAGS_NOOPT) $(DBG_INFO_CXX_ALWAYS) $(COMP_EXE)$@ $< $(APP_LDFLAGS_NOOPT) $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)app-pause-app$(EXE_SUFFIX): app-pause-app.cpp $(THREADLIB)
+	$(APP_CXX) $(COMPONENT_INCLUDES) $(APP_CXXFLAGS) $(COMP_EXE)$@ $^ $(APP_LDFLAGS) $(APP_LPATHS) $(APP_LIBS) $(APP_LIB_ATOMIC)
+
+###### Special objects' build rules ######
+
+$(OBJDIR)stack-debugger$(OBJ_SUFFIX): $(TOOLS_ROOT)/ManualExamples/stack-debugger.cpp
+	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)debugger-shell$(OBJ_SUFFIX): $(TOOLS_ROOT)/InstLib/debugger-shell.cpp
+	$(CXX) $(TOOL_CXXFLAGS) $(SUPPRESS_WARNING_ALIGNED_NEW) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)start-fini-callback$(OBJ_SUFFIX): start-fini-callback.cpp
+	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)simple-pindb-asm-$(TARGET)$(OBJ_SUFFIX): simple-pindb-asm-$(TARGET)$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(DBG_INFO_CXX_ALWAYS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)win-foo-library$(OBJ_SUFFIX): win-foo-library.cpp
+	$(APP_CXX) $(APP_CXXFLAGS_NOOPT) $(DLL_CXXFLAGS) $(DBG_INFO_CXX_ALWAYS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)set_xmm_scratches_asm$(OBJ_SUFFIX): set_xmm_scratches_$(TARGET)$(ASM_SUFFIX)
+	$(ASMBLR) $(ASM_FLAGS) $(DBG_INFO_CXX_ALWAYS) $(COMP_OBJ)$@ $<
+
+###### Special dlls' build rules ######
+
+$(OBJDIR)$(DLL_PREFIX)win-foo-library$(DLL_SUFFIX): $(OBJDIR)win-foo-library$(OBJ_SUFFIX)
+	$(LINKER) $(APP_LDFLAGS_NOOPT) $(DLL_LDFLAGS) $(LINK_EXE)$@ $< $(APP_LIBS) $(DBG_INFO_LD_ALWAYS)
+
+$(OBJDIR)$(DLL_PREFIX)win-exception-after-exit-dll$(DLL_SUFFIX): win-exception-after-exit-dll.cpp
+	$(APP_CXX) $(APP_CXXFLAGS) $(DLL_CXXFLAGS) $(COMP_EXE)$@ $< $(APP_LDFLAGS) $(DLL_LDFLAGS) $(APP_LIBS)

@@ -1,0 +1,14 @@
+b GLOBAL_FUNCTION
+
+# There are 8 worker threads and each worker will stop twice
+# (breakpoint at GlobalFunction() and tool breakpoint).  We
+# need one more "continue" to cause the process to exit.  It's
+# likely that multiple breakpoints will happen simultaneously,
+# so we probably won't need to continue this many times, but
+# it's an upper bound.
+#
+# 17 = 8*2 + 1
+#
+c 17 verbose
+
+q

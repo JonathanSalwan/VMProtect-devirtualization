@@ -1,0 +1,21 @@
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+There are 3 pending breakpoints:
+Thread .* stopped at .* \(after step\)
+There are 3 pending breakpoints:
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+There are 2 pending breakpoints:
+Thread .* stopped at .* \(after step\)
+There are 2 pending breakpoints:
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+There are 1 pending breakpoints:
+Thread .* stopped at .* \(after step\)
+There are 1 pending breakpoints:
+Thread .* stopped at .* \(at tool breakpoint\)
+Stopping in Worker Thread [0-9]+
+There are 0 pending breakpoints:
+Thread .* stopped at .* \(after step\)
+There are 0 pending breakpoints:
+Program exited with 0

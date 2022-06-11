@@ -1,0 +1,3 @@
+monitor pin foo
+monitor mycommand
+q

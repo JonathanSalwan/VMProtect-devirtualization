@@ -1,0 +1,7 @@
+# Start running the debugged application
+c
+# Continue running all stopped threads once they stopped
+# themselves using PIN_ApplicationBreakpoint()
+c
+# We're done - quit the debugger
+q

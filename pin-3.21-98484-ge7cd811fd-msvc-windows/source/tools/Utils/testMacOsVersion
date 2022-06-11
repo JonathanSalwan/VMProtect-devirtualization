@@ -1,0 +1,44 @@
+#! /bin/bash
+
+
+# This script gets two arguments:
+# 1) An operand (eq/ne/ge/gt/le/lt) 
+# 2) A version number 
+# and returns the result of the comparison against macOS version (sw_vers).
+#
+# Example usage:
+# To test whether the macOS version is == 10.11.4 , run the following command:
+# testMacOSVersion eq 10.11.4
+
+dist_ver="`sw_vers | grep ProductVersion | cut -d ':' -f 2 | head -1`" 
+#echo $dist_ver
+
+# this function takes a string in version format (s.a 2.6.16) and makes it an integer (00020006001600000000)
+function digit_version { echo $1 | awk -F. '{ printf("%04d%04d%04d\n", $1, $2, $3); }'; }
+
+script_dir=`dirname $0`
+dist_ver=$(digit_version $dist_ver)
+#echo $dist_ver
+
+arg_ver=$(digit_version $2)
+#echo $arg_ver
+
+case $1 in
+    "eq" )  if [ $dist_ver -eq $arg_ver ]; then echo 1; else echo 0; fi;;
+    "ne" )  if [ $dist_ver -ne $arg_ver ]; then echo 1; else echo 0; fi;;
+    "lt" )  if [ $dist_ver -lt $arg_ver ]; then echo 1; else echo 0; fi;;
+    "le" )  if [ $dist_ver -le $arg_ver ]; then echo 1; else echo 0; fi;;
+    "gt" )  if [ $dist_ver -gt $arg_ver ]; then echo 1; else echo 0; fi;;
+    "ge" )  if [ $dist_ver -ge $arg_ver ]; then echo 1; else echo 0; fi;;
+    "" | "-help" | "--help") echo "
+    # This script gets two arguments:
+    # 1) An operand (eq/ne/ge/gt/le/lt) 
+    # 2) A version number 
+    # and returns the result of the comparison against macOS version (sw_vers).
+    #
+    # Example usage:
+    # To test whether the macOS version is == 10.11.4 , run the following command:
+    # testLinuxDistVersion eq 10.11.4
+    " ;;
+    * )     echo "Bad argument $1 (should be eq/ne/ge/gt/le/lt), do --help for more information " ;;
+esac

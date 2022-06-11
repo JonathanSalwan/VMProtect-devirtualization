@@ -1,0 +1,160 @@
+#
+# Copyright (C) 2006-2019 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+-*- text -*-
+
+There are 4 pintools here: 
+
+1) mix: single threaded runs only!! does not appropriately handle threads in user apps.
+
+2) mix-mt: handles variable number of threads. Designed for windows which creates/destroys 
+   lots of threads. This is probably the one you want to use.
+
+3) mix-mt2 : simpler verison without the controller. does not handle markers.
+
+4) mix-mt-fixed: fixed maximum number of threads.
+
+---------------------------------------------------------------
+
+This program is called "mix" (or mix-mt, etc.). It  does static and dynamic:
+	instruction mix counting, or
+	ISA extension counting, or
+        ISA category counting.
+
+(Note: static profiles are only available on Linux and macOS*. Not on Windows).
+
+---------------------------------------------------------------
+
+The mix-mt program has a special knob called -mapaddr which emits
+information about the counts associated with file/line numbers of the
+soures to the output file.  The output file is parsed by the
+summarize.py script in this directory and will create .pcov files
+which decorate the counts on the sources.
+
+The summarize.py script will sort and combine lines that have the same
+line number (but different pc values). It will decorate any sources
+that are writable, making a new source file suffixed with .pcov.
+
+The counts are ranked from most frequent to least frequent.  Each
+decorated source line has the ranking and the instruction count. The
+ranking is prefixed by "AA" to facilitate grepping for them in the
+.pcov files.
+
+Note: you are still required to supply -opcode, -category or
+      -extension as a pin tool argument/knob.
+
+Note: It is possible to get separate counts for different threads.
+      The summarize.py script does not support this this yet.
+
+---------------------------------------------------------------
+
+
+Here is an example user program with marker functions called marker-example.cpp. 
+
+#include <iostream>
+using namespace std;
+extern "C" 
+{
+ void marker_start_counting() {}
+ void marker_stop_counting() {}
+ void marker_emit_stats() {}
+ void marker_zero_stats() {}
+} // end of extern "C"
+
+int main(int argc, char** argv)
+{
+    for (int i=0;i<3;i++)
+    {
+        marker_zero_stats();
+        marker_start_counting();
+        cout << "Hello" << endl;
+        marker_stop_counting();
+        marker_emit_stats();
+    }
+    marker_zero_stats(); // this is important or the final stats will be double-tallied
+    return 0;
+}
+
+
+To run mix on the compiled program marker-example, use the following command:
+
+../Bin/pin -t ./mix -category -start_address marker_start_counting:repeat -stop_address marker_stop_counting:repeat -zero_stats_address marker_zero_stats:repeat -emit_stats_address marker_emit_stats:repeat -- ./marker-example
+
+In the above, we specify 5 options to the pin tool:
+
+   -category   
+             Indicates we should count instruction categories. Other options
+	     include -opcode or -extension .
+
+  -start_address marker_start_counting:repeat
+
+             This option is the name of the function that causes us to
+             start counting. The :repeat indicates that all occurrences of
+             this function should initiate counting.  A nonzero value
+             after the colon would indicate that the N'th instance of
+             the execution of this function should initiate counting.
+             If there is no colon and number, the default is 1, which
+             indicates just the first instance of this symbol would
+             initiate counting.
+        
+  -stop_address marker_stop_counting:repeat 
+	      This is the start marker function. The :repeat acts like in -start_address.
+
+  -zero_stats_address marker_zero_stats:repeat 
+	      This is the marker to zero the stats. The :repeat acts like in -start_address.
+
+  -emit_stats_address marker_emit_stats:repeat 
+	      This is the marker to emit the stats. The :repeat acts like in -start_address.
+	      All stats are dumped to the same output file.
+
+
+The output file defaults to mix.out. That file name can be changed with the -o pintool option.
+
+Markers have the following general format:
+	
+	marker[:count][:repeat]
+
+Order does not matter for the optional components, shown in square brackets above.
+
+The ":count" indicates the number of times that the marker must be reach before the event
+specified by the knob occurs.  The default count is 1 if no count is given.  Events are only
+triggered once unless the ":repeat" option is provided as well.
+
+
+The  "marker" can be:
+    - A hex number         (e.g. 0x40002344)
+    - A symbol             (e.g. main)
+    - A symbol + offset    (e.g. main+0x123)
+    - A image name + an offset in to the text section (e.g. /usr/lib/libc.a+0x4325)
+
+
+Some examples of options that can be passed to the above (start/stop/zero/emit) switches:
+
+     marker          (will cause an event to occur once, the first time marker is executed)
+     marker:3        (will cause an event to occur once, the third time marker is executed)
+     marker:3:repeat (will cause an event to occur every third time marker is executed)
+     marker:repeat   (will cause an event to occur every time marker is executed)
+
+
+There are other switches that can allow more sophisticated sampling behavior.
+
+To get the pintool help/usage message use this:	
+
+  ../Bin/pin -t ./mix -help -- ./marker-example
+
+
+
+----------
+
+Multithreading support
+
+1) the mix tool requires an upper bound on the number of threads via
+the tool switch: "-max_threads N" where N is the number of threads <=
+MAX_THREADS, currently defined to be 64.  Mix requires this number so
+that it opens one output file per thread at the start of the run. See
+the makefile target test-mt.test for an example.
+
+2) If you have more than one thread, the thread id is appended to the
+output file name, after a "."

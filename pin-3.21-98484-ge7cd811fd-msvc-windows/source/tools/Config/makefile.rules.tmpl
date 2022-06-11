@@ -1,0 +1,246 @@
+#
+# Copyright (C) 2012-2020 Intel Corporation.
+# SPDX-License-Identifier: MIT
+#
+
+##############################################################
+#
+# This file includes all the test targets as well as all the
+# non-default build rules and test recipes.
+#
+##############################################################
+
+###### Additional includes that are specific to this directory ######
+
+# Placeholder for additional include files.
+
+
+##############################################################
+#
+# Test targets
+#
+##############################################################
+
+###### Place all generic definitions here ######
+
+# This defines tests which run tools of the same name.  This is simply for convenience to avoid
+# defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
+# Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
+TEST_TOOL_ROOTS :=
+
+# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
+TEST_ROOTS :=
+
+# This defines the tools which will be run during the the tests, and were not already defined in
+# TEST_TOOL_ROOTS.
+TOOL_ROOTS :=
+
+# This defines the static analysis tools which will be run during the the tests. They should not
+# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
+# TEST_ROOTS.
+# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
+# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
+# of an application or dll. Pin itself is not used when this tool runs.
+SA_TOOL_ROOTS :=
+
+# This defines all the applications that will be run during the tests.
+APP_ROOTS :=
+
+# This defines any additional object files that need to be compiled.
+OBJECT_ROOTS :=
+
+# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
+DLL_ROOTS :=
+
+# This defines any static libraries (archives), that need to be built.
+LIB_ROOTS :=
+
+###### Place architecture-specific definitions here ######
+
+# Place ia32-specific definitions here if they apply to all supported operating systems.
+ifeq ($(TARGET),ia32)
+    TEST_TOOL_ROOTS +=
+    TEST_ROOTS +=
+    TOOL_ROOTS +=
+    SA_TOOL_ROOTS +=
+    APP_ROOTS +=
+    OBJECT_ROOTS +=
+    DLL_ROOTS +=
+    LIB_ROOTS +=
+endif
+
+# Place intel64-specific definitions here if they apply to all supported operating systems.
+ifeq ($(TARGET),intel64)
+    TEST_TOOL_ROOTS +=
+    TEST_ROOTS +=
+    TOOL_ROOTS +=
+    SA_TOOL_ROOTS +=
+    APP_ROOTS +=
+    OBJECT_ROOTS +=
+    DLL_ROOTS +=
+    LIB_ROOTS +=
+endif
+
+###### Place OS-specific definitions here ######
+
+# Linux
+ifeq ($(TARGET_OS),linux)
+    TEST_TOOL_ROOTS +=
+    TEST_ROOTS +=
+    TOOL_ROOTS +=
+    SA_TOOL_ROOTS +=
+    APP_ROOTS +=
+    OBJECT_ROOTS +=
+    DLL_ROOTS +=
+    LIB_ROOTS +=
+    ifeq ($(TARGET),ia32)
+        TEST_TOOL_ROOTS +=
+        TEST_ROOTS +=
+        TOOL_ROOTS +=
+        SA_TOOL_ROOTS +=
+        APP_ROOTS +=
+        OBJECT_ROOTS +=
+        DLL_ROOTS +=
+        LIB_ROOTS +=
+    endif
+    ifeq ($(TARGET),intel64)
+        TEST_TOOL_ROOTS +=
+        TEST_ROOTS +=
+        TOOL_ROOTS +=
+        SA_TOOL_ROOTS +=
+        APP_ROOTS +=
+        OBJECT_ROOTS +=
+        DLL_ROOTS +=
+        LIB_ROOTS +=
+    endif
+endif
+
+# macOS*
+ifeq ($(TARGET_OS),mac)
+    TEST_TOOL_ROOTS +=
+    TEST_ROOTS +=
+    TOOL_ROOTS +=
+    SA_TOOL_ROOTS +=
+    APP_ROOTS +=
+    OBJECT_ROOTS +=
+    DLL_ROOTS +=
+    LIB_ROOTS +=
+    ifeq ($(TARGET),ia32)
+        TEST_TOOL_ROOTS +=
+        TEST_ROOTS +=
+        TOOL_ROOTS +=
+        SA_TOOL_ROOTS +=
+        APP_ROOTS +=
+        OBJECT_ROOTS +=
+        DLL_ROOTS +=
+        LIB_ROOTS +=
+    endif
+    ifeq ($(TARGET),intel64)
+        TEST_TOOL_ROOTS +=
+        TEST_ROOTS +=
+        TOOL_ROOTS +=
+        SA_TOOL_ROOTS +=
+        APP_ROOTS +=
+        OBJECT_ROOTS +=
+        DLL_ROOTS +=
+        LIB_ROOTS +=
+    endif
+endif
+
+# Windows
+ifeq ($(TARGET_OS),windows)
+    TEST_TOOL_ROOTS +=
+    TEST_ROOTS +=
+    TOOL_ROOTS +=
+    SA_TOOL_ROOTS +=
+    APP_ROOTS +=
+    OBJECT_ROOTS +=
+    DLL_ROOTS +=
+    LIB_ROOTS +=
+    ifeq ($(TARGET),ia32)
+        TEST_TOOL_ROOTS +=
+        TEST_ROOTS +=
+        TOOL_ROOTS +=
+        SA_TOOL_ROOTS +=
+        APP_ROOTS +=
+        OBJECT_ROOTS +=
+        DLL_ROOTS +=
+        LIB_ROOTS +=
+    endif
+    ifeq ($(TARGET),intel64)
+        TEST_TOOL_ROOTS +=
+        TEST_ROOTS +=
+        TOOL_ROOTS +=
+        SA_TOOL_ROOTS +=
+        APP_ROOTS +=
+        OBJECT_ROOTS +=
+        DLL_ROOTS +=
+        LIB_ROOTS +=
+    endif
+endif
+
+###### Handle exceptions here (OS/arch related) ######
+
+# If some tests need to be disabled because of unsupported features on OS/arch, do this here
+
+# This defines the full list of tests prior to applying any bug related filters.
+# It is being used to generate a report about filtered tests.
+RUNNABLE_TESTS := 
+
+###### Handle exceptions here (bugs related) ######
+
+# If some tests need to be disabled because of known failures, do this here
+
+###### Define the serial subset ######
+
+# Defines which tests need to be run serially as may cause issues when running in parallel 
+SERIAL_SUBSET := 
+
+###### Define the sanity subset ######
+
+# This defines the list of tests that should run in sanity. It should include all the tests listed in
+# TEST_TOOL_ROOTS and TEST_ROOTS excluding only unstable tests.
+SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
+
+
+##############################################################
+#
+# Test recipes
+#
+##############################################################
+
+###### Finalize sanity here ######
+
+# This section contains recipes for tests other than the default.
+# See makefile.default.rules for the default test rules.
+# All tests in this section should adhere to the naming convention: <testname>.test
+
+
+##############################################################
+#
+# Build rules
+#
+##############################################################
+
+# This section contains the build rules for all binaries that have special build rules.
+# See makefile.default.rules for the default build rules.
+
+###### Special tools' build rules ######
+
+# placeholder for special tools' build rules
+
+###### Special applications' build rules ######
+
+# placeholder for special applications' build rules
+
+###### Special objects' build rules ######
+
+# placeholder for special objects' build rules
+
+###### Special dlls' build rules ######
+
+# placeholder for special dlls' build rules
+
+###### Special libs' build rules ######
+
+# placeholder for special libs' build rules
